@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peers List</title>
+    <link rel="stylesheet" href="/static/peers_list.css">
+</head>
+<body>
+    <h1>Peers List</h1>
+    <div class="container">
+        <div class="form-container">
+            <table class="peers-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Public Key</th>
+                        <th>Allowed IPs</th>
+                        <th>Endpoint</th>
+                        <th>Keepalive</th>
+                        <th>Download Config</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for peer in peers %}
+                    <tr>
+                        <td>{{ peer.name }}</td>
+                        <td>{{ peer.public_key }}</td>
+                        <td>{{ peer.allowed_ips }}</td>
+                        <td>{{ peer.endpoint }}</td>
+                        <td>{{ peer.persistent_keepalive }}</td>
+                        <td>
+                            <a href="/download/{{ peer.name }}" class="download-button">Download</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

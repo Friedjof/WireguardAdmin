@@ -1,0 +1,8 @@
+.env
+
+wg0.conf
+
+venv/
+__pycache__/
+
+instance/

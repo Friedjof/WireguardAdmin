@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}{{ peer.name }} - WireGuard Manager{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-user me-2"></i>{{ peer.name }}</h1>
+    <div class="btn-group" role="group">
+        <a href="{{ url_for('list_peers') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Peers
+        </a>
+        <a href="{{ url_for('edit_peer', peer_id=peer.id) }}" class="btn btn-warning">
+            <i class="fas fa-edit me-1"></i>Edit
+        </a>
+        <a href="{{ url_for('download_peer_config', peer_id=peer.id) }}" class="btn btn-success">
+            <i class="fas fa-download me-1"></i>Download Config
+        </a>
+        <a href="{{ url_for('delete_peer_confirm', peer_id=peer.id) }}" class="btn btn-danger">
+            <i class="fas fa-trash me-1"></i>Delete
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Peer Details</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-3">ID:</dt>
+                    <dd class="col-sm-9">{{ peer.id }}</dd>
+
+                    <dt class="col-sm-3">Name:</dt>
+                    <dd class="col-sm-9">
+                        <strong>{{ peer.name }}</strong>
+                    </dd>
+
+                    <dt class="col-sm-3">Public Key:</dt>
+                    <dd class="col-sm-9">
+                        <div class="d-flex align-items-center">
+                            <code class="me-2 text-break">{{ peer.public_key }}</code>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('{{ peer.public_key }}', this)" title="Copy public key">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </dd>
+
+                    <dt class="col-sm-3">Preshared Key:</dt>
+                    <dd class="col-sm-9">
+                        <div class="d-flex align-items-center">
+                            <code class="me-2 text-break">{{ peer.preshared_key }}</code>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('{{ peer.preshared_key }}', this)" title="Copy preshared key">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">Auto-generated for enhanced security</small>
+                    </dd>
+
+                    <dt class="col-sm-3">Allowed IPs:</dt>
+                    <dd class="col-sm-9">
+                        <div class="d-flex align-items-center">
+                            <span class="badge bg-info me-2">{{ peer.allowed_ips }}</span>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('{{ peer.allowed_ips }}', this)" title="Copy IP range">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </dd>
+
+                    <dt class="col-sm-3">Endpoint:</dt>
+                    <dd class="col-sm-9">
+                        {% if peer.endpoint %}
+                            <div class="d-flex align-items-center">
+                                <span class="me-2">{{ peer.endpoint }}</span>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('{{ peer.endpoint }}', this)" title="Copy endpoint">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        {% else %}
+                            <span class="text-muted fst-italic">Not configured</span>
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-sm-3">Persistent Keepalive:</dt>
+                    <dd class="col-sm-9">
+                        {% if peer.persistent_keepalive %}
+                            <span class="badge bg-secondary">{{ peer.persistent_keepalive }} seconds</span>
+                        {% else %}
+                            <span class="text-muted fst-italic">Default (25 seconds)</span>
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-sm-3">Created:</dt>
+                    <dd class="col-sm-9">
+                        <span class="text-muted">{{ peer.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</span>
+                    </dd>
+
+                    <dt class="col-sm-3">Last Updated:</dt>
+                    <dd class="col-sm-9">
+                        <span class="text-muted">{{ peer.updated_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</span>
+                    </dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-file-code me-2"></i>Client Configuration</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    This is the configuration file that the client should use to connect to the WireGuard server.
+                    Replace <code>&lt;PLACEHOLDER_FOR_CLIENT_PRIVATE_KEY&gt;</code> with the client's private key.
+                </p>
+                <div class="position-relative">
+                    <pre class="bg-dark text-light p-3 rounded"><code id="clientConfig">[Interface]
+PrivateKey = &lt;PLACEHOLDER_FOR_CLIENT_PRIVATE_KEY&gt;
+Address = {{ peer.allowed_ips }}
+
+[Peer]
+PublicKey = {{ config.SERVER_PUBLIC_KEY or 'SERVER_PUBLIC_KEY_NOT_SET' }}
+PresharedKey = {{ peer.preshared_key }}
+Endpoint = {{ config.SERVER_IP or 'SERVER_IP_NOT_SET' }}:{{ config.LISTEN_PORT or 'LISTEN_PORT_NOT_SET' }}
+AllowedIPs = 0.0.0.0/0
+PersistentKeepalive = {{ peer.persistent_keepalive or 25 }}</code></pre>
+                    <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyToClipboard(document.getElementById('clientConfig').textContent, this)" title="Copy configuration">
+                        <i class="fas fa-copy"></i> Copy Config
+                    </button>
+                </div>
+                <div class="mt-3">
+                    <a href="{{ url_for('download_peer_config', peer_id=peer.id) }}" class="btn btn-success">
+                        <i class="fas fa-download me-1"></i>Download as File
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Connection Status</h5>
+            </div>
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    <i class="fas fa-question-circle fa-3x text-muted"></i>
+                </div>
+                <p class="text-muted">Connection status monitoring not implemented yet.</p>
+                <small class="text-muted">
+                    Future feature: Real-time connection status, last seen, data transfer statistics.
+                </small>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-tools me-2"></i>Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('edit_peer', peer_id=peer.id) }}" class="btn btn-warning btn-sm">
+                        <i class="fas fa-edit me-1"></i>Edit Configuration
+                    </a>
+                    <a href="{{ url_for('download_peer_config', peer_id=peer.id) }}" class="btn btn-success btn-sm">
+                        <i class="fas fa-download me-1"></i>Download Config File
+                    </a>
+                    <button class="btn btn-info btn-sm" onclick="showQRCode()">
+                        <i class="fas fa-qrcode me-1"></i>Show QR Code
+                    </button>
+                    <hr>
+                    <a href="{{ url_for('delete_peer_confirm', peer_id=peer.id) }}" class="btn btn-danger btn-sm">
+                        <i class="fas fa-trash me-1"></i>Delete Peer
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Usage Instructions</h5>
+            </div>
+            <div class="card-body">
+                <h6>For Mobile Devices:</h6>
+                <ol class="small">
+                    <li>Install WireGuard app</li>
+                    <li>Tap "+" to add tunnel</li>
+                    <li>Scan QR code or import config file</li>
+                    <li>Replace placeholder with private key</li>
+                </ol>
+                
+                <h6>For Desktop:</h6>
+                <ol class="small">
+                    <li>Install WireGuard client</li>
+                    <li>Download config file</li>
+                    <li>Replace placeholder with private key</li>
+                    <li>Import into WireGuard</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- QR Code Modal -->
+<div class="modal fade" id="qrCodeModal" tabindex="-1" aria-labelledby="qrCodeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="qrCodeModalLabel">
+                    <i class="fas fa-qrcode me-2"></i>QR Code for {{ peer.name }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div id="qrCodeContainer">
+                    <div class="d-flex justify-content-center align-items-center" style="height: 300px;">
+                        <div class="text-muted">
+                            <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                            <p>QR Code generation not implemented yet</p>
+                            <small>Future feature: Generate QR code for easy mobile import</small>
+                        </div>
+                    </div>
+                </div>
+                <p class="mt-3 small text-muted">
+                    Scan this QR code with the WireGuard mobile app to quickly import the configuration.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="downloadQRCode()" disabled>
+                    <i class="fas fa-download me-1"></i>Download QR Code
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showQRCode() {
+    const modal = new bootstrap.Modal(document.getElementById('qrCodeModal'));
+    modal.show();
+    
+    // In a real implementation, this would generate an actual QR code
+    // using a library like qrcode.js or by calling a backend endpoint
+}
+
+function downloadQRCode() {
+    // Placeholder for QR code download functionality
+    alert('QR Code download not implemented yet. This would download the QR code as a PNG file.');
+}
+
+// Add some interactivity
+document.addEventListener('DOMContentLoaded', function() {
+    // Highlight copyable elements on hover
+    const copyButtons = document.querySelectorAll('button[onclick*="copyToClipboard"]');
+    copyButtons.forEach(button => {
+        button.addEventListener('mouseenter', function() {
+            this.closest('.d-flex').querySelector('code, span').style.backgroundColor = 'rgba(13, 110, 253, 0.1)';
+        });
+        button.addEventListener('mouseleave', function() {
+            this.closest('.d-flex').querySelector('code, span').style.backgroundColor = '';
+        });
+    });
+});
+</script>
+{% endblock %}

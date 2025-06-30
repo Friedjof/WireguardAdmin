@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ peer.name }} - WireGuard Manager{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-edit me-2"></i>Edit Peer: {{ peer.name }}</h1>
+    <div class="btn-group" role="group">
+        <a href="{{ url_for('show_peer', peer_id=peer.id) }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Details
+        </a>
+        <a href="{{ url_for('list_peers') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-list me-1"></i>All Peers
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-user-edit me-2"></i>Update Peer Configuration</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('update_peer', peer_id=peer.id) }}" method="post">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">
+                            <i class="fas fa-tag me-1"></i>Peer Name <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="name" 
+                               name="name" 
+                               value="{{ peer.name }}"
+                               required 
+                               pattern="[a-zA-Z0-9_-]+"
+                               title="Only letters, numbers, hyphens and underscores allowed">
+                        <div class="form-text">A unique name to identify this peer (alphanumeric, -, _ only)</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="public_key" class="form-label">
+                            <i class="fas fa-key me-1"></i>Public Key <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group">
+                            <input type="text" 
+                                   class="form-control font-monospace" 
+                                   id="public_key" 
+                                   name="public_key" 
+                                   value="{{ peer.public_key }}"
+                                   required>
+                            <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard('{{ peer.public_key }}', this)" title="Copy current key">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">The WireGuard public key for this peer</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="allowed_ips" class="form-label">
+                            <i class="fas fa-network-wired me-1"></i>Allowed IPs <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="allowed_ips" 
+                               name="allowed_ips" 
+                               value="{{ peer.allowed_ips }}"
+                               required>
+                        <div class="form-text">IP addresses/ranges this peer is allowed to use (CIDR notation)</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="endpoint" class="form-label">
+                            <i class="fas fa-globe me-1"></i>Endpoint <span class="text-muted">(Optional)</span>
+                        </label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="endpoint" 
+                               name="endpoint" 
+                               value="{{ peer.endpoint or '' }}"
+                               placeholder="e.g., example.com:51820, 192.168.1.100:12000">
+                        <div class="form-text">The endpoint address and port where this peer can be reached</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="persistent_keepalive" class="form-label">
+                            <i class="fas fa-heartbeat me-1"></i>Persistent Keepalive <span class="text-muted">(Optional)</span>
+                        </label>
+                        <div class="input-group">
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="persistent_keepalive" 
+                                   name="persistent_keepalive" 
+                                   value="{{ peer.persistent_keepalive or '' }}"
+                                   min="0" 
+                                   max="65535" 
+                                   placeholder="25">
+                            <span class="input-group-text">seconds</span>
+                        </div>
+                        <div class="form-text">Interval for keepalive packets (recommended: 25 seconds for NAT traversal)</div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-1"></i>
+                        <strong>Note:</strong> The preshared key cannot be changed and will remain as: 
+                        <code>{{ peer.preshared_key[:10] }}...</code>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('show_peer', peer_id=peer.id) }}" class="btn btn-outline-secondary me-md-2">
+                            <i class="fas fa-times me-1"></i>Cancel
+                        </a>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-save me-1"></i>Update Peer
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Current Configuration</h5>
+            </div>
+            <div class="card-body">
+                <dl class="small">
+                    <dt>Peer ID:</dt>
+                    <dd>{{ peer.id }}</dd>
+                    
+                    <dt>Created:</dt>
+                    <dd>{{ peer.created_at.strftime('%Y-%m-%d %H:%M') }}</dd>
+                    
+                    <dt>Last Updated:</dt>
+                    <dd>{{ peer.updated_at.strftime('%Y-%m-%d %H:%M') }}</dd>
+                    
+                    <dt>Preshared Key:</dt>
+                    <dd>
+                        <div class="d-flex align-items-center">
+                            <code class="me-2">{{ peer.preshared_key[:20] }}...</code>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('{{ peer.preshared_key }}', this)" title="Copy preshared key">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">Auto-generated, cannot be changed</small>
+                    </dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Important Notes</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <h6><i class="fas fa-shield-alt me-1"></i>Security Considerations</h6>
+                    <ul class="small mb-0">
+                        <li>Changing the public key will require updating the client configuration</li>
+                        <li>Changing allowed IPs may affect routing</li>
+                        <li>The preshared key cannot be modified for security reasons</li>
+                    </ul>
+                </div>
+                
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-sync-alt me-1"></i>After Update</h6>
+                    <ul class="small mb-0">
+                        <li>Server configuration (wg0.conf) will be automatically regenerated</li>
+                        <li>Client configurations may need to be redistributed</li>
+                        <li>Active connections using old settings will need to reconnect</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-tools me-2"></i>Validation Tips</h5>
+            </div>
+            <div class="card-body">
+                <h6><i class="fas fa-check-circle me-1"></i>Field Requirements</h6>
+                <ul class="small">
+                    <li><strong>Name:</strong> Only alphanumeric, hyphens, underscores</li>
+                    <li><strong>Public Key:</strong> Must be valid WireGuard key format (44 characters)</li>
+                    <li><strong>Allowed IPs:</strong> Valid CIDR notation (e.g., 10.0.0.1/32)</li>
+                    <li><strong>Endpoint:</strong> Format: hostname:port or ip:port</li>
+                    <li><strong>Keepalive:</strong> Number between 0-65535 seconds</li>
+                </ul>
+                
+                <div class="mt-3">
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="validateForm()">
+                        <i class="fas fa-check me-1"></i>Test Validation
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-history me-2"></i>Change History</h5>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted">
+                    Change history tracking is not yet implemented. Future versions will show:
+                </p>
+                <ul class="small text-muted">
+                    <li>Who made changes and when</li>
+                    <li>What fields were modified</li>
+                    <li>Previous values for rollback</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Form validation
+function validateForm() {
+    const form = document.querySelector('form');
+    const name = document.getElementById('name').value;
+    const publicKey = document.getElementById('public_key').value;
+    const allowedIps = document.getElementById('allowed_ips').value;
+    const endpoint = document.getElementById('endpoint').value;
+    const keepalive = document.getElementById('persistent_keepalive').value;
+    
+    let errors = [];
+    
+    // Validate name
+    if (!name.match(/^[a-zA-Z0-9_-]+$/)) {
+        errors.push('Name can only contain letters, numbers, hyphens and underscores');
+    }
+    
+    // Validate public key
+    if (publicKey.length !== 44 || !publicKey.match(/^[A-Za-z0-9+/]{43}=$/)) {
+        errors.push('Invalid WireGuard public key format');
+    }
+    
+    // Validate allowed IPs (basic check)
+    if (!allowedIps.match(/^\d+\.\d+\.\d+\.\d+\/\d+$/)) {
+        errors.push('Allowed IPs should be in CIDR format (e.g., 10.0.0.1/32)');
+    }
+    
+    // Validate endpoint (if provided)
+    if (endpoint && !endpoint.match(/^[a-zA-Z0-9.-]+:\d+$/)) {
+        errors.push('Endpoint should be in format hostname:port');
+    }
+    
+    // Validate keepalive (if provided)
+    if (keepalive && (isNaN(keepalive) || keepalive < 0 || keepalive > 65535)) {
+        errors.push('Persistent keepalive should be a number between 0 and 65535');
+    }
+    
+    if (errors.length === 0) {
+        alert('✅ All fields look valid!');
+    } else {
+        alert('❌ Validation errors:\n\n' + errors.join('\n'));
+    }
+}
+
+// Real-time validation feedback
+document.addEventListener('DOMContentLoaded', function() {
+    const inputs = ['name', 'public_key', 'allowed_ips', 'endpoint', 'persistent_keepalive'];
+    
+    inputs.forEach(inputId => {
+        const input = document.getElementById(inputId);
+        if (input) {
+            input.addEventListener('blur', function() {
+                validateField(this);
+            });
+        }
+    });
+});
+
+function validateField(field) {
+    const fieldName = field.id;
+    const value = field.value.trim();
+    let isValid = true;
+    let message = '';
+    
+    switch(fieldName) {
+        case 'name':
+            isValid = value.match(/^[a-zA-Z0-9_-]+$/);
+            message = isValid ? '' : 'Only letters, numbers, hyphens and underscores allowed';
+            break;
+        case 'public_key':
+            isValid = value.length === 44 && value.match(/^[A-Za-z0-9+/]{43}=$/);
+            message = isValid ? '' : 'Invalid WireGuard public key format';
+            break;
+        case 'allowed_ips':
+            isValid = value.match(/^\d+\.\d+\.\d+\.\d+\/\d+$/);
+            message = isValid ? '' : 'Use CIDR format (e.g., 10.0.0.1/32)';
+            break;
+        case 'endpoint':
+            if (value) {
+                isValid = value.match(/^[a-zA-Z0-9.-]+:\d+$/);
+                message = isValid ? '' : 'Use format hostname:port';
+            }
+            break;
+        case 'persistent_keepalive':
+            if (value) {
+                const num = parseInt(value);
+                isValid = !isNaN(num) && num >= 0 && num <= 65535;
+                message = isValid ? '' : 'Must be between 0 and 65535';
+            }
+            break;
+    }
+    
+    // Update field styling
+    field.classList.remove('is-valid', 'is-invalid');
+    const feedback = field.parentNode.querySelector('.invalid-feedback');
+    if (feedback) feedback.remove();
+    
+    if (value && !isValid) {
+        field.classList.add('is-invalid');
+        const feedbackDiv = document.createElement('div');
+        feedbackDiv.className = 'invalid-feedback';
+        feedbackDiv.textContent = message;
+        field.parentNode.appendChild(feedbackDiv);
+    } else if (value) {
+        field.classList.add('is-valid');
+    }
+}
+
+// Form submission with confirmation
+document.querySelector('form').addEventListener('submit', function(e) {
+    const name = document.getElementById('name').value;
+    
+    if (!confirm(`Are you sure you want to update peer "${name}"?\n\nThis will regenerate the server configuration and may affect active connections.`)) {
+        e.preventDefault();
+    }
+});
+
+// Highlight changes
+document.addEventListener('DOMContentLoaded', function() {
+    const originalValues = {
+        name: '{{ peer.name }}',
+        public_key: '{{ peer.public_key }}',
+        allowed_ips: '{{ peer.allowed_ips }}',
+        endpoint: '{{ peer.endpoint or "" }}',
+        persistent_keepalive: '{{ peer.persistent_keepalive or "" }}'
+    };
+    
+    Object.keys(originalValues).forEach(fieldName => {
+        const field = document.getElementById(fieldName);
+        if (field) {
+            field.addEventListener('input', function() {
+                const isChanged = this.value !== originalValues[fieldName];
+                this.style.backgroundColor = isChanged ? 'rgba(255, 193, 7, 0.1)' : '';
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

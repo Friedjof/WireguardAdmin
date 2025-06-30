@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+
+{% block title %}Delete {{ peer.name }} - WireGuard Manager{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-exclamation-triangle text-danger me-2"></i>Delete Peer</h1>
+    <div class="btn-group" role="group">
+        <a href="{{ url_for('show_peer', peer_id=peer.id) }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Details
+        </a>
+        <a href="{{ url_for('list_peers') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-list me-1"></i>All Peers
+        </a>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="fas fa-trash me-2"></i>Confirm Peer Deletion</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-danger">
+                    <h4 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Warning!</h4>
+                    <p>You are about to permanently delete the peer <strong>"{{ peer.name }}"</strong>.</p>
+                    <hr>
+                    <p class="mb-0">This action cannot be undone and will:</p>
+                </div>
+
+                <ul class="list-group list-group-flush mb-4">
+                    <li class="list-group-item">
+                        <i class="fas fa-times-circle text-danger me-2"></i>
+                        Remove all peer configuration data from the database
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-sync-alt text-warning me-2"></i>
+                        Automatically regenerate the server configuration (wg0.conf)
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-unlink text-warning me-2"></i>
+                        Disconnect any active connections from this peer
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-file-times text-info me-2"></i>
+                        Invalidate all previously downloaded client configurations
+                    </li>
+                </ul>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Peer Details to be Deleted</h6>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row">
+                            <dt class="col-sm-3">Name:</dt>
+                            <dd class="col-sm-9"><strong>{{ peer.name }}</strong></dd>
+
+                            <dt class="col-sm-3">Public Key:</dt>
+                            <dd class="col-sm-9">
+                                <code class="small">{{ peer.public_key }}</code>
+                            </dd>
+
+                            <dt class="col-sm-3">Allowed IPs:</dt>
+                            <dd class="col-sm-9">
+                                <span class="badge bg-info">{{ peer.allowed_ips }}</span>
+                            </dd>
+
+                            <dt class="col-sm-3">Endpoint:</dt>
+                            <dd class="col-sm-9">
+                                {% if peer.endpoint %}
+                                    {{ peer.endpoint }}
+                                {% else %}
+                                    <span class="text-muted fst-italic">Not configured</span>
+                                {% endif %}
+                            </dd>
+
+                            <dt class="col-sm-3">Created:</dt>
+                            <dd class="col-sm-9">
+                                <small class="text-muted">{{ peer.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</small>
+                            </dd>
+
+                            <dt class="col-sm-3">Last Updated:</dt>
+                            <dd class="col-sm-9">
+                                <small class="text-muted">{{ peer.updated_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</small>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-lightbulb me-2"></i>Before You Delete</h6>
+                    <p class="mb-2">Consider these alternatives:</p>
+                    <ul class="mb-0">
+                        <li><strong>Edit:</strong> Update the peer configuration instead of deleting</li>
+                        <li><strong>Backup:</strong> Download the configuration file for future reference</li>
+                        <li><strong>Document:</strong> Note the reason for deletion for audit purposes</li>
+                    </ul>
+                </div>
+
+                <form action="{{ url_for('delete_peer', peer_id=peer.id) }}" method="post" id="deleteForm">
+                    <div class="mb-3">
+                        <label for="confirmation" class="form-label">
+                            <strong>Type "{{ peer.name }}" to confirm deletion:</strong>
+                        </label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="confirmation" 
+                               name="confirmation" 
+                               required 
+                               placeholder="Enter peer name to confirm"
+                               autocomplete="off">
+                        <div class="form-text">This helps prevent accidental deletions</div>
+                    </div>
+
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" 
+                               type="checkbox" 
+                               id="understand" 
+                               name="understand" 
+                               required>
+                        <label class="form-check-label" for="understand">
+                            I understand that this action cannot be undone and will permanently delete this peer
+                        </label>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('show_peer', peer_id=peer.id) }}" class="btn btn-outline-secondary me-md-2">
+                            <i class="fas fa-times me-1"></i>Cancel
+                        </a>
+                        <a href="{{ url_for('edit_peer', peer_id=peer.id) }}" class="btn btn-warning me-md-2">
+                            <i class="fas fa-edit me-1"></i>Edit Instead
+                        </a>
+                        <button type="submit" class="btn btn-danger" id="deleteButton" disabled>
+                            <i class="fas fa-trash me-1"></i>Delete Peer Permanently
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-download me-2"></i>Last Chance Backup</h5>
+            </div>
+            <div class="card-body">
+                <p class="small">Download the peer configuration before deletion:</p>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('download_peer_config', peer_id=peer.id) }}" class="btn btn-success btn-sm">
+                        <i class="fas fa-download me-1"></i>Download Config File
+                    </a>
+                    <button class="btn btn-info btn-sm" onclick="showQRCode()">
+                        <i class="fas fa-qrcode me-1"></i>Show QR Code
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Security Note</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <h6>After deletion:</h6>
+                    <ul class="small mb-0">
+                        <li>The preshared key will be lost forever</li>
+                        <li>Any client using this configuration will lose connection</li>
+                        <li>The allocated IP address will become available for reuse</li>
+                        <li>Server will automatically restart WireGuard service</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Recent Activity</h5>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted">
+                    Activity monitoring is not yet implemented. Future versions will show:
+                </p>
+                <ul class="small text-muted">
+                    <li>Last connection time</li>
+                    <li>Data transfer statistics</li>
+                    <li>Connection history</li>
+                    <li>Usage patterns</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- QR Code Modal -->
+<div class="modal fade" id="qrCodeModal" tabindex="-1" aria-labelledby="qrCodeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="qrCodeModalLabel">
+                    <i class="fas fa-qrcode me-2"></i>QR Code for {{ peer.name }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div id="qrCodeContainer">
+                    <div class="d-flex justify-content-center align-items-center" style="height: 300px;">
+                        <div class="text-muted">
+                            <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                            <p>QR Code generation not implemented yet</p>
+                            <small>This would generate a QR code for mobile import</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const confirmationInput = document.getElementById('confirmation');
+    const understandCheckbox = document.getElementById('understand');
+    const deleteButton = document.getElementById('deleteButton');
+    const expectedName = '{{ peer.name }}';
+    
+    function checkFormValidity() {
+        const isNameCorrect = confirmationInput.value === expectedName;
+        const isUnderstood = understandCheckbox.checked;
+        
+        deleteButton.disabled = !(isNameCorrect && isUnderstood);
+        
+        // Visual feedback for name input
+        confirmationInput.classList.remove('is-valid', 'is-invalid');
+        if (confirmationInput.value.length > 0) {
+            if (isNameCorrect) {
+                confirmationInput.classList.add('is-valid');
+            } else {
+                confirmationInput.classList.add('is-invalid');
+            }
+        }
+    }
+    
+    confirmationInput.addEventListener('input', checkFormValidity);
+    understandCheckbox.addEventListener('change', checkFormValidity);
+    
+    // Form submission with final confirmation
+    document.getElementById('deleteForm').addEventListener('submit', function(e) {
+        if (!confirm(`FINAL CONFIRMATION\n\nAre you absolutely sure you want to delete peer "${expectedName}"?\n\nThis action cannot be undone!`)) {
+            e.preventDefault();
+        }
+    });
+    
+    // Auto-focus on confirmation input
+    confirmationInput.focus();
+    
+    // Prevent accidental form submission with Enter key
+    confirmationInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            understandCheckbox.focus();
+        }
+    });
+});
+
+function showQRCode() {
+    const modal = new bootstrap.Modal(document.getElementById('qrCodeModal'));
+    modal.show();
+}
+
+// Add some dramatic effect for the danger zone
+document.addEventListener('DOMContentLoaded', function() {
+    const deleteButton = document.getElementById('deleteButton');
+    
+    deleteButton.addEventListener('mouseenter', function() {
+        this.classList.add('pulse');
+    });
+    
+    deleteButton.addEventListener('mouseleave', function() {
+        this.classList.remove('pulse');
+    });
+});
+</script>
+
+<style>
+.pulse {
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(220, 53, 69, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+    }
+}
+
+.card.border-danger {
+    border-width: 2px;
+}
+
+.bg-danger {
+    background: linear-gradient(135deg, #dc3545, #b02a37) !important;
+}
+</style>
+{% endblock %}
