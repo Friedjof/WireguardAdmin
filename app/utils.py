@@ -9,11 +9,11 @@ import base64
 
 def generate_wg0_conf():
     server_private_key = os.getenv("SERVER_PRIVATE_KEY")
-    server_ip = os.getenv("SERVER_IP")
+    vpn_server_ip = os.getenv("VPN_SERVER_IP", "10.0.0.1")  # VPN internal server IP
     listen_port = os.getenv("LISTEN_PORT")
 
     config = f"""[Interface]
-Address = {server_ip}
+Address = {vpn_server_ip}
 PrivateKey = {server_private_key}
 ListenPort = {listen_port}
 """
@@ -36,8 +36,20 @@ AllowedIPs = {peer.combined_allowed_ips}
         else:
             config += "PersistentKeepalive = 25\n"  # Default to 25 seconds if not set
 
+    # Write to application directory
     with open("wg0.conf", "w") as f:
         f.write(config)
+    
+    # Also write to WireGuard system directory if running in container/production
+    try:
+        if os.path.exists("/etc/wireguard"):
+            with open("/etc/wireguard/wg0.conf", "w") as f:
+                f.write(config)
+            # Set correct permissions for WireGuard
+            os.chmod("/etc/wireguard/wg0.conf", 0o600)
+    except (PermissionError, OSError):
+        # Continue if we can't write to system directory (development mode)
+        pass
 
     return "wg0.conf generated successfully."
 
@@ -535,7 +547,7 @@ def generate_peer_config_text(peer_id):
         raise ValueError(f"Peer with ID {peer_id} not found")
     
     server_public_key = os.getenv("SERVER_PUBLIC_KEY")
-    server_ip = os.getenv("SERVER_IP")
+    server_public_ip = os.getenv("SERVER_PUBLIC_IP", "127.0.0.1")  # Public IP for client endpoint
     listen_port = os.getenv("LISTEN_PORT")
     
     # Build the address line with assigned IP and additional allowed IPs
@@ -557,7 +569,7 @@ Address = {address_line}
 [Peer]
 PublicKey = {server_public_key}
 PresharedKey = {peer.preshared_key}
-Endpoint = {server_ip}:{listen_port}
+Endpoint = {server_public_ip}:{listen_port}
 AllowedIPs = 0.0.0.0/0
 PersistentKeepalive = {peer.persistent_keepalive or 25}"""
     

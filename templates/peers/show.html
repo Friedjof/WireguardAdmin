@@ -305,7 +305,7 @@ Address = {{ peer.assigned_ip }}/32{% if peer.allowed_ip_ranges %}{% for allowed
 [Peer]
 PublicKey = {{ config.SERVER_PUBLIC_KEY or 'SERVER_PUBLIC_KEY_NOT_SET' }}
 PresharedKey = {{ peer.preshared_key }}
-Endpoint = {{ config.SERVER_IP or 'SERVER_IP_NOT_SET' }}:{{ config.LISTEN_PORT or 'LISTEN_PORT_NOT_SET' }}
+Endpoint = {{ config.SERVER_PUBLIC_IP or 'SERVER_PUBLIC_IP_NOT_SET' }}:{{ config.LISTEN_PORT or 'LISTEN_PORT_NOT_SET' }}
 AllowedIPs = 0.0.0.0/0
 PersistentKeepalive = {{ peer.persistent_keepalive or 25 }}</code></pre>
                     <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-2" onclick="copyToClipboard(document.getElementById('clientConfig').textContent, this)" title="Copy configuration">

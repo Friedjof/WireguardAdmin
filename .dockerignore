@@ -1,0 +1,31 @@
+# Virtual environment
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Development files
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.log
+.DS_Store
+Thumbs.db
+
+# Local configuration
+.env.local
+*.local
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+test_*
+*_test.py

@@ -21,35 +21,45 @@
                 <table class="table table-hover">
                     <thead>
                         <tr>
-                            <th>Active</th>
+                            <th>Connection</th>
                             <th>Name</th>
                             <th>Public Key</th>
                             <th>Assigned IP</th>
                             <th>Endpoint</th>
-                            <th>Keepalive</th>
+                            <th>Transfer</th>
                             <th>Created</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for peer in peers %}
-                        <tr>
+                        <tr data-peer-id="{{ peer.id }}">
                             <td>
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input peer-toggle" 
-                                           type="checkbox" 
-                                           id="peer-toggle-{{ peer.id }}" 
-                                           data-peer-id="{{ peer.id }}"
-                                           data-peer-name="{{ peer.name }}"
-                                           {% if peer.is_active %}checked{% endif %}
-                                           onchange="togglePeerStatus(this)">
-                                    <label class="form-check-label peer-status-label" for="peer-toggle-{{ peer.id }}">
-                                        {% if peer.is_active %}
-                                            <span class="text-success fw-bold">Active</span>
-                                        {% else %}
-                                            <span class="text-warning fw-bold">Inactive</span>
-                                        {% endif %}
-                                    </label>
+                                <div class="d-flex align-items-center">
+                                    <div class="form-check form-switch me-3">
+                                        <input class="form-check-input peer-toggle" 
+                                               type="checkbox" 
+                                               id="peer-toggle-{{ peer.id }}" 
+                                               data-peer-id="{{ peer.id }}"
+                                               data-peer-name="{{ peer.name }}"
+                                               {% if peer.is_active %}checked{% endif %}
+                                               onchange="togglePeerStatus(this)">
+                                        <label class="form-check-label peer-status-label" for="peer-toggle-{{ peer.id }}">
+                                            {% if peer.is_active %}
+                                                <span class="text-success fw-bold">Active</span>
+                                            {% else %}
+                                                <span class="text-warning fw-bold">Inactive</span>
+                                            {% endif %}
+                                        </label>
+                                    </div>
+                                    <div class="connection-indicator">
+                                        <div class="connection-dot" id="connection-dot-{{ peer.id }}" title="Connection status">
+                                            <div class="dot-inner"></div>
+                                        </div>
+                                        <small class="connection-text ms-2" id="connection-text-{{ peer.id }}">
+                                            <span class="text-muted">Checking...</span>
+                                        </small>
+                                    </div>
                                 </div>
                             </td>
                             <td>
@@ -79,11 +89,12 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if peer.persistent_keepalive %}
-                                    <span class="badge bg-secondary">{{ peer.persistent_keepalive }}s</span>
-                                {% else %}
-                                    <span class="text-muted fst-italic">Default</span>
-                                {% endif %}
+                                <div id="transfer-{{ peer.id }}">
+                                    <div class="transfer-info">
+                                        <div class="transfer-rx">↓ --</div>
+                                        <div class="transfer-tx">↑ --</div>
+                                    </div>
+                                </div>
                             </td>
                             <td>
                                 <small class="text-muted">{{ peer.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
@@ -219,6 +230,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/live-status.js') }}"></script>
 <script>
 async function togglePeerStatus(toggleElement) {
     const peerId = toggleElement.dataset.peerId;

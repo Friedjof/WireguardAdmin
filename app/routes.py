@@ -2,6 +2,7 @@ from flask import request, jsonify, render_template, Response, redirect, url_for
 from app import app, db
 from app.models import Peer, AllowedIP, FirewallRule
 from app.utils import generate_wg0_conf, validate_peer_data, get_next_available_ip, validate_multiple_allowed_ips, apply_iptables_rules, get_current_iptables_rules, validate_iptables_access, backup_iptables_rules, restore_iptables_rules, generate_iptables_rules, generate_peer_qr_code
+from app.wireguard_status import get_wireguard_status, get_peer_connection_status, format_bytes, format_time_ago
 import subprocess
 import os
 import re
@@ -312,7 +313,7 @@ def download_peer_config(peer_id):
     peer = Peer.query.get_or_404(peer_id)
     
     server_public_key = os.getenv("SERVER_PUBLIC_KEY")
-    server_ip = os.getenv("SERVER_IP")
+    server_public_ip = os.getenv("SERVER_PUBLIC_IP", "127.0.0.1")  # Public IP for client endpoint
     listen_port = os.getenv("LISTEN_PORT")
 
     # Use assigned_ip for client address if available, otherwise use combined_allowed_ips or fallback to allowed_ips
@@ -672,7 +673,7 @@ def api_get_peer_config(peer_id):
         }), 404
     
     server_public_key = os.getenv("SERVER_PUBLIC_KEY")
-    server_ip = os.getenv("SERVER_IP")
+    server_public_ip = os.getenv("SERVER_PUBLIC_IP", "127.0.0.1")  # Public IP for client endpoint
     listen_port = os.getenv("LISTEN_PORT")
 
     config = f"""[Interface]
@@ -682,7 +683,7 @@ Address = {peer.allowed_ips}
 [Peer]
 PublicKey = {server_public_key}
 PresharedKey = {peer.preshared_key}
-Endpoint = {server_ip}:{listen_port}
+Endpoint = {server_public_ip}:{listen_port}
 AllowedIPs = 0.0.0.0/0
 PersistentKeepalive = {peer.persistent_keepalive or 25}
 """
@@ -960,4 +961,78 @@ def api_delete_firewall_rule(rule_id):
         return jsonify({
             'status': 'error',
             'message': f'Error deleting rule: {str(e)}'
+        }), 500
+
+# WireGuard Live Status API
+@app.route('/api/v1/wireguard/status', methods=['GET'])
+def api_wireguard_status():
+    """Get live WireGuard connection status for all peers"""
+    try:
+        # Get WireGuard status
+        wg_status = get_wireguard_status()
+        
+        # Get all peers from database
+        peers = Peer.query.all()
+        
+        # Combine database info with live status
+        peer_status = {}
+        for peer in peers:
+            live_data = wg_status.get(peer.public_key, {})
+            peer_status[str(peer.id)] = {
+                'peer_id': peer.id,
+                'name': peer.name,
+                'public_key': peer.public_key,
+                'assigned_ip': peer.assigned_ip,
+                'is_active': peer.is_active,
+                'is_connected': live_data.get('is_connected', False),
+                'endpoint': live_data.get('endpoint'),
+                'latest_handshake': format_time_ago(live_data.get('latest_handshake')),
+                'transfer_rx': live_data.get('transfer_rx', 0),
+                'transfer_tx': live_data.get('transfer_tx', 0),
+                'transfer_rx_formatted': format_bytes(live_data.get('transfer_rx', 0)),
+                'transfer_tx_formatted': format_bytes(live_data.get('transfer_tx', 0)),
+                'persistent_keepalive': live_data.get('persistent_keepalive')
+            }
+        
+        return jsonify({
+            'status': 'success',
+            'data': peer_status,
+            'total_peers': len(peers),
+            'connected_peers': len([p for p in peer_status.values() if p['is_connected']])
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error getting WireGuard status: {str(e)}'
+        }), 500
+
+@app.route('/api/v1/peers/<int:peer_id>/status', methods=['GET'])
+def api_peer_live_status(peer_id):
+    """Get live status for a specific peer"""
+    try:
+        peer = Peer.query.get_or_404(peer_id)
+        status = get_peer_connection_status(peer.public_key)
+        
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'peer_id': peer.id,
+                'name': peer.name,
+                'is_active': peer.is_active,
+                'is_connected': status['is_connected'],
+                'endpoint': status['endpoint'],
+                'latest_handshake': format_time_ago(status['latest_handshake']),
+                'transfer_rx': status['transfer_rx'],
+                'transfer_tx': status['transfer_tx'],
+                'transfer_rx_formatted': format_bytes(status['transfer_rx']),
+                'transfer_tx_formatted': format_bytes(status['transfer_tx']),
+                'persistent_keepalive': status['persistent_keepalive']
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error getting peer status: {str(e)}'
         }), 500
