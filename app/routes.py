@@ -16,10 +16,10 @@ def list_peers():
 def new_peer():
     try:
         next_ip = get_next_available_ip()
-        return render_template('peers/create.html', next_available_ip=next_ip)
+        return render_template('peers/form.html', peer=None, next_available_ip=next_ip)
     except Exception as e:
         flash(f'Error getting next available IP: {str(e)}', 'error')
-        return render_template('peers/create.html', next_available_ip=None)
+        return render_template('peers/form.html', peer=None, next_available_ip=None)
 
 @app.route('/api/v1/next-ip', methods=['GET'])
 def get_next_ip():
@@ -66,24 +66,24 @@ def create_peer():
         for field in required_fields:
             if not data.get(field) or not data.get(field).strip():
                 flash(f'{field.replace("_", " ").title()} is required', 'error')
-                return render_template('peers/create.html'), 400
+                return render_template('peers/form.html', peer=None), 400
 
         # Check for existing peer with same name
         if Peer.query.filter_by(name=data['name']).first():
             flash('Peer with this name already exists', 'error')
-            return render_template('peers/create.html'), 400
+            return render_template('peers/form.html', peer=None), 400
 
         # Check for existing peer with same public key
         if Peer.query.filter_by(public_key=data['public_key']).first():
             flash('Peer with this public key already exists', 'error')
-            return render_template('peers/create.html'), 400
+            return render_template('peers/form.html', peer=None), 400
 
         # Auto-assign IP address
         try:
             assigned_ip = get_next_available_ip()
         except ValueError as e:
             flash(str(e), 'error')
-            return render_template('peers/create.html'), 400
+            return render_template('peers/form.html', peer=None), 400
 
         # Validate allowed IP networks if provided
         if ip_data:
@@ -92,7 +92,7 @@ def create_peer():
             if not is_valid:
                 for error in errors:
                     flash(error, 'error')
-                return render_template('peers/create.html'), 400
+                return render_template('peers/form.html', peer=None), 400
 
         # Generate preshared key
         preshared_key = subprocess.check_output("wg genpsk", shell=True).decode().strip()
@@ -163,7 +163,7 @@ def create_peer():
     except Exception as e:
         db.session.rollback()
         flash(f'Error creating peer: {str(e)}', 'error')
-        return render_template('peers/create.html'), 500
+        return render_template('peers/form.html', peer=None), 500
 
 @app.route('/peers/<int:peer_id>', methods=['GET'])
 def show_peer(peer_id):
@@ -173,7 +173,7 @@ def show_peer(peer_id):
 @app.route('/peers/<int:peer_id>/edit', methods=['GET'])
 def edit_peer(peer_id):
     peer = Peer.query.get_or_404(peer_id)
-    return render_template('peers/edit.html', peer=peer)
+    return render_template('peers/form.html', peer=peer)
 
 @app.route('/peers/<int:peer_id>', methods=['POST'])
 def update_peer(peer_id):
@@ -198,19 +198,19 @@ def update_peer(peer_id):
         for field in required_fields:
             if not data.get(field) or not data.get(field).strip():
                 flash(f'{field.replace("_", " ").title()} is required', 'error')
-                return render_template('peers/edit.html', peer=peer), 400
+                return render_template('peers/form.html', peer=peer), 400
 
         # Check for existing peer with same name (excluding current peer)
         existing_peer = Peer.query.filter_by(name=data['name']).first()
         if existing_peer and existing_peer.id != peer_id:
             flash('Peer with this name already exists', 'error')
-            return render_template('peers/edit.html', peer=peer), 400
+            return render_template('peers/form.html', peer=peer), 400
 
         # Check for existing peer with same public key (excluding current peer)
         existing_peer = Peer.query.filter_by(public_key=data['public_key']).first()
         if existing_peer and existing_peer.id != peer_id:
             flash('Peer with this public key already exists', 'error')
-            return render_template('peers/edit.html', peer=peer), 400
+            return render_template('peers/form.html', peer=peer), 400
 
         # Validate allowed IP networks if provided
         if ip_data:
@@ -219,7 +219,7 @@ def update_peer(peer_id):
             if not is_valid:
                 for error in errors:
                     flash(error, 'error')
-                return render_template('peers/edit.html', peer=peer), 400
+                return render_template('peers/form.html', peer=peer), 400
 
         # Update peer basic data
         peer.name = data['name']
@@ -283,7 +283,7 @@ def update_peer(peer_id):
     except Exception as e:
         db.session.rollback()
         flash(f'Error updating peer: {str(e)}', 'error')
-        return render_template('peers/edit.html', peer=peer), 500
+        return render_template('peers/form.html', peer=peer), 500
 
 @app.route('/peers/<int:peer_id>/delete', methods=['GET'])
 def delete_peer_confirm(peer_id):

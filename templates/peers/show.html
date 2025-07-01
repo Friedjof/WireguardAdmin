@@ -3,88 +3,7 @@
 {% block title %}{{ peer.name }} - WireGuard Manager{% endblock %}
 
 {% block head %}
-<style>
-.console-container {
-    background: #1a1a1a;
-    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-    font-size: 14px;
-    max-height: 500px;
-    overflow-y: auto;
-}
-
-.console-content {
-    padding: 20px;
-    color: #00ff00;
-    background: #000;
-    border: none;
-    min-height: 400px;
-}
-
-.console-line {
-    display: block;
-    padding: 2px 8px;
-    margin: 1px 0;
-    border-radius: 3px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    white-space: pre-wrap;
-    word-break: break-all;
-}
-
-.console-line:hover {
-    background-color: rgba(0, 255, 0, 0.1);
-}
-
-.console-line.comment {
-    color: #888;
-    font-style: italic;
-}
-
-.console-line.command {
-    color: #00ff00;
-}
-
-.console-line.rule-command {
-    color: #00ddff;
-}
-
-.console-line.copied {
-    background-color: rgba(0, 255, 0, 0.3) !important;
-    animation: pulse 0.5s;
-}
-
-@keyframes pulse {
-    0% { background-color: rgba(0, 255, 0, 0.3); }
-    50% { background-color: rgba(0, 255, 0, 0.6); }
-    100% { background-color: rgba(0, 255, 0, 0.3); }
-}
-
-.console-container::-webkit-scrollbar {
-    width: 8px;
-}
-
-.console-container::-webkit-scrollbar-track {
-    background: #1a1a1a;
-}
-
-.console-container::-webkit-scrollbar-thumb {
-    background: #555;
-    border-radius: 4px;
-}
-
-.console-container::-webkit-scrollbar-thumb:hover {
-    background: #777;
-}
-
-.terminal-prompt {
-    color: #ffaa00;
-    font-weight: bold;
-}
-
-.terminal-path {
-    color: #00aaff;
-}
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/console.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -192,190 +111,162 @@
             </div>
         </div>
 
+        <!-- Additional Allowed IPs Section -->
+        {% if peer.allowed_ip_ranges %}
         <div class="card mt-4">
             <div class="card-header">
                 <h5 class="mb-0"><i class="fas fa-route me-2"></i>Additional Allowed IPs</h5>
             </div>
             <div class="card-body">
-                {% if peer.allowed_ip_ranges %}
-                    <p class="text-muted mb-3">
-                        Additional IP networks this peer is allowed to access beyond the assigned VPN IP.
-                    </p>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-bordered align-middle">
-                            <thead class="table-light">
-                                <tr>
-                                    <th width="40%"><i class="fas fa-network-wired me-1"></i>Network</th>
-                                    <th width="35%"><i class="fas fa-comment me-1"></i>Description</th>
-                                    <th width="20%"><i class="fas fa-calendar me-1"></i>Created</th>
-                                    <th width="5%"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for allowed_ip in peer.allowed_ip_ranges %}
-                                <tr>
-                                    <td>
-                                        <code class="text-primary">{{ allowed_ip.ip_network }}</code>
-                                    </td>
-                                    <td>
-                                        <span class="text-muted">{{ allowed_ip.description or '-' }}</span>
-                                    </td>
-                                    <td>
-                                        <small class="text-muted">{{ allowed_ip.created_at.strftime('%Y-%m-%d') }}</small>
-                                    </td>
-                                    <td>
-                                        <button class="btn btn-outline-secondary btn-sm" 
-                                                onclick="copyToClipboard('{{ allowed_ip.ip_network }}', this)" 
-                                                title="Copy network">
-                                            <i class="fas fa-copy"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="mt-3">
-                        <button class="btn btn-outline-primary btn-sm" onclick="copyAllAllowedIps()">
-                            <i class="fas fa-copy me-1"></i>Copy All Networks
-                        </button>
-                        <span class="text-muted ms-2">
-                            Total: {{ peer.allowed_ip_ranges|length }} additional network(s)
-                        </span>
-                    </div>
-                {% else %}
-                    <div class="text-center py-4">
-                        <i class="fas fa-info-circle fa-2x text-muted mb-3"></i>
-                        <p class="text-muted mb-2">No additional allowed IPs configured for this peer.</p>
-                        <small class="text-muted">
-                            This peer can only access its assigned VPN IP address. 
-                            <a href="{{ url_for('edit_peer', peer_id=peer.id) }}" class="text-decoration-none">
-                                Add additional networks
-                            </a> if needed.
-                        </small>
-                    </div>
-                {% endif %}
+                <p class="text-muted mb-3">
+                    Additional IP networks this peer is allowed to access beyond the assigned VPN IP.
+                </p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="40%"><i class="fas fa-network-wired me-1"></i>Network</th>
+                                <th width="35%"><i class="fas fa-comment me-1"></i>Description</th>
+                                <th width="20%"><i class="fas fa-calendar me-1"></i>Created</th>
+                                <th width="5%"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for allowed_ip in peer.allowed_ip_ranges %}
+                            <tr>
+                                <td>
+                                    <code class="text-primary">{{ allowed_ip.ip_network }}</code>
+                                </td>
+                                <td>
+                                    <span class="text-muted">{{ allowed_ip.description or '-' }}</span>
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ allowed_ip.created_at.strftime('%Y-%m-%d') }}</small>
+                                </td>
+                                <td>
+                                    <button class="btn btn-outline-secondary btn-sm" 
+                                            onclick="copyToClipboard('{{ allowed_ip.ip_network }}', this)" 
+                                            title="Copy network">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3">
+                    <button class="btn btn-outline-primary btn-sm" onclick="copyAllAllowedIps()">
+                        <i class="fas fa-copy me-1"></i>Copy All Networks
+                    </button>
+                    <span class="text-muted ms-2">
+                        Total: {{ peer.allowed_ip_ranges|length }} additional network(s)
+                    </span>
+                </div>
             </div>
         </div>
+        {% endif %}
 
         <!-- Firewall Rules Section -->
+        {% if peer.firewall_rules %}
         <div class="card mt-4">
             <div class="card-header">
                 <h5 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Firewall Rules</h5>
             </div>
             <div class="card-body">
-                {% if peer.firewall_rules %}
-                    <p class="text-muted mb-3">
-                        iptables firewall rules configured for this peer to control network access.
-                    </p>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-bordered align-middle">
-                            <thead class="table-light">
-                                <tr>
-                                    <th width="20%"><i class="fas fa-tag me-1"></i>Name</th>
-                                    <th width="12%"><i class="fas fa-shield-alt me-1"></i>Action</th>
-                                    <th width="15%"><i class="fas fa-cogs me-1"></i>Type</th>
-                                    <th width="20%"><i class="fas fa-crosshairs me-1"></i>Destination</th>
-                                    <th width="12%"><i class="fas fa-network-wired me-1"></i>Protocol</th>
-                                    <th width="12%"><i class="fas fa-door-open me-1"></i>Port</th>
-                                    <th width="9%"><i class="fas fa-sort-numeric-down me-1"></i>Priority</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for rule in peer.firewall_rules|sort(attribute='priority') %}
-                                <tr>
-                                    <td>
-                                        <strong class="text-dark">{{ rule.name }}</strong>
-                                        {% if rule.description %}
-                                        <br><small class="text-muted">{{ rule.description }}</small>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if rule.action == 'ALLOW' %}
-                                        <span class="badge bg-success">🟢 Allow</span>
+                <p class="text-muted mb-3">
+                    iptables firewall rules configured for this peer to control network access.
+                </p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="20%"><i class="fas fa-tag me-1"></i>Name</th>
+                                <th width="12%"><i class="fas fa-shield-alt me-1"></i>Action</th>
+                                <th width="15%"><i class="fas fa-cogs me-1"></i>Type</th>
+                                <th width="20%"><i class="fas fa-crosshairs me-1"></i>Destination</th>
+                                <th width="12%"><i class="fas fa-network-wired me-1"></i>Protocol</th>
+                                <th width="12%"><i class="fas fa-door-open me-1"></i>Port</th>
+                                <th width="9%"><i class="fas fa-sort-numeric-down me-1"></i>Priority</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for rule in peer.firewall_rules|sort(attribute='priority') %}
+                            <tr>
+                                <td>
+                                    <strong class="text-dark">{{ rule.name }}</strong>
+                                    {% if rule.description %}
+                                    <br><small class="text-muted">{{ rule.description }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if rule.action == 'ALLOW' %}
+                                    <span class="badge bg-success">🟢 Allow</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">🔴 Deny</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">
+                                        {% if rule.rule_type == 'internet' %}
+                                        🌐 Internet
+                                        {% elif rule.rule_type == 'peer_comm' %}
+                                        👥 Peer Comm
+                                        {% elif rule.rule_type == 'port' %}
+                                        🔌 Port Filter
+                                        {% elif rule.rule_type == 'subnet' %}
+                                        🏠 Subnet
                                         {% else %}
-                                        <span class="badge bg-danger">🔴 Deny</span>
+                                        ⚙️ Custom
                                         {% endif %}
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-secondary">
-                                            {% if rule.rule_type == 'internet' %}
-                                            🌐 Internet
-                                            {% elif rule.rule_type == 'peer_comm' %}
-                                            👥 Peer Comm
-                                            {% elif rule.rule_type == 'port' %}
-                                            🔌 Port Filter
-                                            {% elif rule.rule_type == 'subnet' %}
-                                            🏠 Subnet
-                                            {% else %}
-                                            ⚙️ Custom
-                                            {% endif %}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <code class="text-primary">{{ rule.destination or 'any' }}</code>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-light text-dark">{{ rule.protocol.upper() }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-info">{{ rule.port_range or 'any' }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-outline-secondary">{{ rule.priority }}</span>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- Rules Summary and Actions -->
-                    <div class="row mt-3">
-                        <div class="col-md-6">
-                            <div class="d-flex align-items-center">
-                                {% set allow_count = peer.firewall_rules|selectattr('action', 'equalto', 'ALLOW')|list|length %}
-                                {% set deny_count = peer.firewall_rules|selectattr('action', 'equalto', 'DENY')|list|length %}
-                                <span class="badge bg-success me-2">{{ allow_count }} Allow Rules</span>
-                                <span class="badge bg-danger">{{ deny_count }} Deny Rules</span>
-                            </div>
-                            <small class="text-muted">Total: {{ peer.firewall_rules|length }} firewall rules configured</small>
+                                    </span>
+                                </td>
+                                <td>
+                                    <code class="text-primary">{{ rule.destination or 'any' }}</code>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark">{{ rule.protocol.upper() }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ rule.port_range or 'any' }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-outline-secondary">{{ rule.priority }}</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Rules Summary and Actions -->
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center">
+                            {% set allow_count = peer.firewall_rules|selectattr('action', 'equalto', 'ALLOW')|list|length %}
+                            {% set deny_count = peer.firewall_rules|selectattr('action', 'equalto', 'DENY')|list|length %}
+                            <span class="badge bg-success me-2">{{ allow_count }} Allow Rules</span>
+                            <span class="badge bg-danger">{{ deny_count }} Deny Rules</span>
                         </div>
-                        <div class="col-md-6 text-end">
-                            <button class="btn btn-outline-info btn-sm" onclick="previewIptablesRules({{ peer.id }})">
-                                <i class="fas fa-eye me-1"></i>Preview iptables
-                            </button>
-                            <button class="btn btn-warning btn-sm ms-1" onclick="applyFirewallRules({{ peer.id }}, true)">
-                                <i class="fas fa-play me-1"></i>Test Apply
-                            </button>
-                            <button class="btn btn-success btn-sm ms-1" onclick="applyFirewallRules({{ peer.id }}, false)">
-                                <i class="fas fa-check me-1"></i>Apply Rules
-                            </button>
-                            <button class="btn btn-outline-secondary btn-sm ms-2" onclick="copyFirewallRules()">
-                                <i class="fas fa-copy me-1"></i>Copy Rules
-                            </button>
-                        </div>
+                        <small class="text-muted">Total: {{ peer.firewall_rules|length }} firewall rules configured</small>
                     </div>
-                {% else %}
-                    <div class="text-center py-4">
-                        <i class="fas fa-shield-alt fa-2x text-muted mb-3"></i>
-                        <p class="text-muted mb-2">No firewall rules configured for this peer.</p>
-                        <small class="text-muted">
-                            This peer has unrestricted access within the VPN. 
-                            <a href="{{ url_for('edit_peer', peer_id=peer.id) }}" class="text-decoration-none">
-                                Configure firewall rules
-                            </a> to restrict access.
-                        </small>
-                        <div class="mt-3">
-                            <span class="badge bg-warning text-dark">
-                                <i class="fas fa-exclamation-triangle me-1"></i>Unrestricted Access
-                            </span>
-                        </div>
+                    <div class="col-md-6 text-end">
+                        <button class="btn btn-outline-info btn-sm" onclick="previewIptablesRules({{ peer.id }})">
+                            <i class="fas fa-eye me-1"></i>Preview iptables
+                        </button>
+                        <button class="btn btn-warning btn-sm ms-1" onclick="applyFirewallRules({{ peer.id }}, true)">
+                            <i class="fas fa-play me-1"></i>Test Apply
+                        </button>
+                        <button class="btn btn-success btn-sm ms-1" onclick="applyFirewallRules({{ peer.id }}, false)">
+                            <i class="fas fa-check me-1"></i>Apply Rules
+                        </button>
                     </div>
-                {% endif %}
+                </div>
             </div>
         </div>
+        {% endif %}
 
+        <!-- Client Configuration Section -->
         <div class="card mt-4">
             <div class="card-header">
                 <h5 class="mb-0"><i class="fas fa-file-code me-2"></i>Client Configuration</h5>
@@ -383,11 +274,11 @@
             <div class="card-body">
                 <p class="text-muted mb-3">
                     This is the configuration file that the client should use to connect to the WireGuard server.
-                    Replace <code><PLACEHOLDER_FOR_CLIENT_PRIVATE_KEY></code> with the client's private key.
+                    Replace <code>&lt;PLACEHOLDER_FOR_CLIENT_PRIVATE_KEY&gt;</code> with the client's private key.
                 </p>
                 <div class="position-relative">
                     <pre class="bg-dark text-light p-3 rounded"><code id="clientConfig">[Interface]
-PrivateKey = <PLACEHOLDER_FOR_CLIENT_PRIVATE_KEY>
+PrivateKey = &lt;PLACEHOLDER_FOR_CLIENT_PRIVATE_KEY&gt;
 Address = {{ peer.assigned_ip }}/32{% if peer.allowed_ip_ranges %}{% for allowed_ip in peer.allowed_ip_ranges %}, {{ allowed_ip.ip_network }}{% endfor %}{% endif %}
 
 [Peer]
@@ -437,7 +328,7 @@ PersistentKeepalive = {{ peer.persistent_keepalive or 25 }}</code></pre>
                     <a href="{{ url_for('download_peer_config', peer_id=peer.id) }}" class="btn btn-success btn-sm">
                         <i class="fas fa-download me-1"></i>Download Config File
                     </a>
-                    <button class="btn btn-info btn-sm" onclick="showQRCode()">
+                    <button class="btn btn-info btn-sm" onclick="showQRCode({{ peer.id }})">
                         <i class="fas fa-qrcode me-1"></i>Show QR Code
                     </button>
                     <hr>
@@ -542,8 +433,7 @@ PersistentKeepalive = {{ peer.persistent_keepalive or 25 }}</code></pre>
                     <div class="d-flex justify-content-center align-items-center" style="height: 300px;">
                         <div class="text-muted">
                             <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
-                            <p>QR Code generation not implemented yet</p>
-                            <small>Future feature: Generate QR code for easy mobile import</small>
+                            <p>Loading...</p>
                         </div>
                     </div>
                 </div>
@@ -563,80 +453,12 @@ PersistentKeepalive = {{ peer.persistent_keepalive or 25 }}</code></pre>
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+<script src="{{ url_for('static', filename='js/console.js') }}"></script>
+<script src="{{ url_for('static', filename='js/qr-code.js') }}"></script>
+
 <script>
-function showQRCode() {
-    const modal = new bootstrap.Modal(document.getElementById('qrCodeModal'));
-    const qrContainer = document.getElementById('qrCodeContainer');
-    const downloadBtn = document.querySelector('button[onclick="downloadQRCode()"]');
-    
-    // Show loading state
-    qrContainer.innerHTML = `
-        <div class="d-flex justify-content-center align-items-center" style="height: 300px;">
-            <div class="text-muted">
-                <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
-                <p>Generating QR Code...</p>
-            </div>
-        </div>
-    `;
-    
-    modal.show();
-    
-    // Fetch QR code from backend
-    fetch(`/peers/{{ peer.id }}/qrcode`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                qrContainer.innerHTML = `
-                    <img src="${data.qr_code}" alt="QR Code for {{ peer.name }}" class="img-fluid" style="max-width: 300px;">
-                `;
-                downloadBtn.disabled = false;
-                
-                // Store QR code data for download
-                window.currentQRCode = data.qr_code;
-                window.currentPeerName = data.peer_name;
-            } else {
-                qrContainer.innerHTML = `
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        Error generating QR code: ${data.message}
-                    </div>
-                `;
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            qrContainer.innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    Failed to generate QR code. Please try again.
-                </div>
-            `;
-        });
-}
-
-function downloadQRCode() {
-    if (!window.currentQRCode || !window.currentPeerName) {
-        alert('No QR code available to download. Please generate QR code first.');
-        return;
-    }
-    
-    try {
-        // Create download link
-        const link = document.createElement('a');
-        link.href = window.currentQRCode;
-        link.download = `${window.currentPeerName}_qrcode.png`;
-        
-        // Trigger download
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    } catch (error) {
-        console.error('Download error:', error);
-        alert('Error downloading QR code. Please try again.');
-    }
-}
-
-// Copy all allowed IPs function
+// Page-specific functions
 function copyAllAllowedIps() {
     const allowedIps = [
         {% for allowed_ip in peer.allowed_ip_ranges %}
@@ -650,49 +472,6 @@ function copyAllAllowedIps() {
         copyToClipboard(allIpsText, document.querySelector('button[onclick="copyAllAllowedIps()"]'));
     } else {
         alert('No allowed IPs to copy.');
-    }
-}
-
-// Firewall Rules Functions
-async function previewIptablesRules(peerId) {
-    const modal = new bootstrap.Modal(document.getElementById('iptablesModal'));
-    const content = document.getElementById('iptablesContent');
-    
-    // Show loading state
-    content.innerHTML = `
-        <div class="d-flex justify-content-center align-items-center" style="height: 400px;">
-            <div class="text-muted">
-                <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
-                <p>Generating iptables rules...</p>
-            </div>
-        </div>
-    `;
-    
-    modal.show();
-    
-    try {
-        const response = await fetch(`/api/v1/firewall/rules/generate?peer_id=${peerId}`);
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-            displayIptablesRules(data.rules);
-            // Store rules for copy/download functions
-            window.currentIptablesRules = data.rules;
-        } else {
-            content.innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    Error generating rules: ${data.message}
-                </div>
-            `;
-        }
-    } catch (error) {
-        content.innerHTML = `
-            <div class="alert alert-danger">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                Error previewing rules: ${error.message}
-            </div>
-        `;
     }
 }
 
@@ -723,9 +502,9 @@ async function applyFirewallRules(peerId, dryRun = false) {
         
         if (data.status === 'success') {
             if (dryRun) {
-                alert('Dry run completed successfully:\\n\\n' + data.rules.join('\\n'));
+                alert('Dry run completed successfully:\n\n' + data.rules.join('\n'));
             } else {
-                alert('Firewall rules applied successfully!\\n\\n' + data.message);
+                alert('Firewall rules applied successfully!\n\n' + data.message);
             }
         } else {
             alert('Error: ' + data.message);
@@ -738,184 +517,5 @@ async function applyFirewallRules(peerId, dryRun = false) {
         button.innerHTML = originalText;
     }
 }
-
-function copyFirewallRules() {
-    const rules = [
-        {% for rule in peer.firewall_rules|sort(attribute='priority') %}
-        '{{ rule.name }}: {{ rule.action }} {{ rule.rule_type }} -> {{ rule.destination or "any" }} ({{ rule.protocol }}{% if rule.port_range %}:{{ rule.port_range }}{% endif %})'{% if not loop.last %},{% endif %}
-        {% endfor %}
-    ];
-    
-    if (rules.length === 0) {
-        alert('No firewall rules to copy.');
-        return;
-    }
-    
-    const rulesText = rules.join('\\n');
-    copyToClipboard(rulesText, document.querySelector('button[onclick="copyFirewallRules()"]'));
-}
-
-// iptables Console Functions
-function displayIptablesRules(rules) {
-    const content = document.getElementById('iptablesContent');
-    
-    let html = '<div class="terminal-prompt">root@wireguard-server:~# </div>';
-    html += '<span class="terminal-path">./generate-iptables.sh</span><br><br>';
-    
-    rules.forEach((rule, index) => {
-        if (rule.startsWith('#')) {
-            html += `<div class="console-line comment" onclick="copyIptableLine(this, ${index})">${rule}</div>`;
-        } else if (rule.trim() === '') {
-            html += '<br>';
-        } else {
-            html += `<div class="console-line rule-command" onclick="copyIptableLine(this, ${index})">${rule}</div>`;
-        }
-    });
-    
-    html += '<br><div class="terminal-prompt">root@wireguard-server:~# </div>';
-    html += '<span class="text-success">✓ iptables rules generated successfully</span>';
-    
-    content.innerHTML = html;
-}
-
-function copyIptableLine(element, index) {
-    const rule = window.currentIptablesRules[index];
-    if (rule && rule.trim() !== '' && !rule.startsWith('#')) {
-        copyToClipboard(rule, element);
-        
-        // Visual feedback
-        element.classList.add('copied');
-        setTimeout(() => {
-            element.classList.remove('copied');
-        }, 500);
-        
-        // Show toast notification
-        showToast(`Copied: ${rule.substring(0, 50)}${rule.length > 50 ? '...' : ''}`, 'success');
-    }
-}
-
-function copyAllIptablesRules() {
-    if (!window.currentIptablesRules || window.currentIptablesRules.length === 0) {
-        showToast('No rules to copy', 'warning');
-        return;
-    }
-    
-    const scriptContent = generateIptablesScript(window.currentIptablesRules);
-    
-    navigator.clipboard.writeText(scriptContent).then(() => {
-        showToast(`Copied all ${window.currentIptablesRules.length} iptables rules to clipboard`, 'success');
-    }).catch(err => {
-        console.error('Failed to copy rules:', err);
-        showToast('Failed to copy rules to clipboard', 'error');
-    });
-}
-
-function downloadIptablesRules() {
-    if (!window.currentIptablesRules || window.currentIptablesRules.length === 0) {
-        showToast('No rules to download', 'warning');
-        return;
-    }
-    
-    const scriptContent = generateIptablesScript(window.currentIptablesRules);
-    const peerName = '{{ peer.name }}';
-    
-    const blob = new Blob([scriptContent], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${peerName}_iptables_rules.sh`;
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-    
-    showToast(`Downloaded iptables script: ${peerName}_iptables_rules.sh`, 'success');
-}
-
-function generateIptablesScript(rules) {
-    const peerName = '{{ peer.name }}';
-    const timestamp = new Date().toISOString();
-    
-    let script = `#!/bin/bash
-# iptables rules for WireGuard peer: ${peerName}
-# Generated on: ${timestamp}
-# 
-# Usage: sudo ./$(basename "$0")
-# 
-# This script applies iptables rules for the specific peer.
-# Make sure to review the rules before applying them.
-
-set -e  # Exit on error
-
-echo "Applying iptables rules for peer: ${peerName}"
-echo "Generated on: ${timestamp}"
-echo ""
-
-`;
-
-    rules.forEach(rule => {
-        if (rule.startsWith('#')) {
-            script += `${rule}\n`;
-        } else if (rule.trim() !== '') {
-            script += `echo "Executing: ${rule}"\n`;
-            script += `${rule}\n`;
-        }
-        script += '\n';
-    });
-
-    script += `
-echo ""
-echo "✓ All iptables rules applied successfully"
-echo "Current FORWARD chain rules:"
-iptables -L FORWARD -n --line-numbers
-`;
-
-    return script;
-}
-
-function showToast(message, type = 'info') {
-    // Create toast element
-    const toast = document.createElement('div');
-    toast.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed`;
-    toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-    toast.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-    
-    document.body.appendChild(toast);
-    
-    // Auto remove after 3 seconds
-    setTimeout(() => {
-        if (toast.parentNode) {
-            toast.parentNode.removeChild(toast);
-        }
-    }, 3000);
-}
-
-// Add some interactivity
-document.addEventListener('DOMContentLoaded', function() {
-    // Highlight copyable elements on hover
-    const copyButtons = document.querySelectorAll('button[onclick*="copyToClipboard"]');
-    copyButtons.forEach(button => {
-        button.addEventListener('mouseenter', function() {
-            const targetElement = this.closest('.d-flex') ? 
-                this.closest('.d-flex').querySelector('code, span') : 
-                this.closest('td') ? this.closest('td').querySelector('code') : null;
-            if (targetElement) {
-                targetElement.style.backgroundColor = 'rgba(13, 110, 253, 0.1)';
-            }
-        });
-        button.addEventListener('mouseleave', function() {
-            const targetElement = this.closest('.d-flex') ? 
-                this.closest('.d-flex').querySelector('code, span') : 
-                this.closest('td') ? this.closest('td').querySelector('code') : null;
-            if (targetElement) {
-                targetElement.style.backgroundColor = '';
-            }
-        });
-    });
-});
 </script>
 {% endblock %}

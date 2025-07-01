@@ -1,0 +1,81 @@
+/* Terminal/Console Styling */
+.console-container {
+    background: #1a1a1a;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 14px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.console-content {
+    padding: 20px;
+    color: #00ff00;
+    background: #000;
+    border: none;
+    min-height: 400px;
+}
+
+.console-line {
+    display: block;
+    padding: 2px 8px;
+    margin: 1px 0;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.console-line:hover {
+    background-color: rgba(0, 255, 0, 0.1);
+}
+
+.console-line.comment {
+    color: #888;
+    font-style: italic;
+}
+
+.console-line.command {
+    color: #00ff00;
+}
+
+.console-line.rule-command {
+    color: #00ddff;
+}
+
+.console-line.copied {
+    background-color: rgba(0, 255, 0, 0.3) !important;
+    animation: pulse 0.5s;
+}
+
+@keyframes pulse {
+    0% { background-color: rgba(0, 255, 0, 0.3); }
+    50% { background-color: rgba(0, 255, 0, 0.6); }
+    100% { background-color: rgba(0, 255, 0, 0.3); }
+}
+
+.console-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.console-container::-webkit-scrollbar-track {
+    background: #1a1a1a;
+}
+
+.console-container::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+}
+
+.console-container::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+
+.terminal-prompt {
+    color: #ffaa00;
+    font-weight: bold;
+}
+
+.terminal-path {
+    color: #00aaff;
+}
