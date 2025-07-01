@@ -1,7 +1,7 @@
 from flask import request, jsonify, render_template, Response, redirect, url_for, flash
 from app import app, db
-from app.models import Peer
-from app.utils import generate_wg0_conf, validate_peer_data, get_next_available_ip, validate_additional_ips
+from app.models import Peer, AllowedIP, FirewallRule
+from app.utils import generate_wg0_conf, validate_peer_data, get_next_available_ip, validate_multiple_allowed_ips, apply_iptables_rules, get_current_iptables_rules, validate_iptables_access, backup_iptables_rules, restore_iptables_rules, generate_iptables_rules, generate_peer_qr_code
 import subprocess
 import os
 import re
@@ -39,10 +39,23 @@ def get_next_ip():
 @app.route('/peers', methods=['POST'])
 def create_peer():
     try:
-        # Convert ImmutableMultiDict to mutable dict for further processing
+        # Get form data
         data = dict(request.form)
-
         print(f"Received data for new peer: {data}")
+
+        # Get allowed IP networks and descriptions as lists
+        allowed_ip_networks = request.form.getlist('allowed_ip_networks[]')
+        allowed_ip_descriptions = request.form.getlist('allowed_ip_descriptions[]')
+        
+        # Filter out empty entries and pair networks with descriptions
+        ip_data = []
+        for i, network in enumerate(allowed_ip_networks):
+            network = network.strip()
+            if network:  # Only add non-empty networks
+                description = allowed_ip_descriptions[i].strip() if i < len(allowed_ip_descriptions) else ""
+                ip_data.append((network, description))
+        
+        print(f"Processed allowed IPs: {ip_data}")
 
         # Set default value for persistent_keepalive if not provided
         if not data.get('persistent_keepalive'):
@@ -72,21 +85,19 @@ def create_peer():
             flash(str(e), 'error')
             return render_template('peers/create.html'), 400
 
-        # Validate additional allowed IPs if provided
-        additional_allowed_ips = None
-        if data.get('additional_allowed_ips') and data['additional_allowed_ips'].strip():
-            try:
-                print(f"Validating additional allowed IPs: {data['additional_allowed_ips']}")
-                validate_additional_ips(data['additional_allowed_ips'])
-                additional_allowed_ips = data['additional_allowed_ips'].strip()
-            except ValueError as e:
-                flash(str(e), 'error')
+        # Validate allowed IP networks if provided
+        if ip_data:
+            networks_only = [network for network, desc in ip_data]
+            is_valid, errors = validate_multiple_allowed_ips(networks_only)
+            if not is_valid:
+                for error in errors:
+                    flash(error, 'error')
                 return render_template('peers/create.html'), 400
 
         # Generate preshared key
         preshared_key = subprocess.check_output("wg genpsk", shell=True).decode().strip()
         
-        # Create new peer with new schema
+        # Create new peer
         new_peer = Peer(
             name=data['name'],
             public_key=data['public_key'],
@@ -97,14 +108,60 @@ def create_peer():
             is_active=True
         )
         
+        # Add peer to session first to get an ID
         db.session.add(new_peer)
+        db.session.flush()  # This assigns an ID without committing
+        
+        # Create AllowedIP objects
+        for network, description in ip_data:
+            allowed_ip = AllowedIP(
+                peer_id=new_peer.id,
+                ip_network=network,
+                description=description if description else None
+            )
+            db.session.add(allowed_ip)
+        
+        # Process Firewall Rules
+        firewall_rule_names = request.form.getlist('firewall_rule_names[]')
+        firewall_rule_actions = request.form.getlist('firewall_rule_actions[]')
+        firewall_rule_types = request.form.getlist('firewall_rule_types[]')
+        firewall_rule_destinations = request.form.getlist('firewall_rule_destinations[]')
+        firewall_rule_protocols = request.form.getlist('firewall_rule_protocols[]')
+        firewall_rule_ports = request.form.getlist('firewall_rule_ports[]')
+        
+        # Create firewall rules
+        firewall_rules_created = 0
+        for i, rule_name in enumerate(firewall_rule_names):
+            rule_name = rule_name.strip()
+            if rule_name:  # Only create rules with names
+                firewall_rule = FirewallRule(
+                    peer_id=new_peer.id,
+                    name=rule_name,
+                    rule_type=firewall_rule_types[i] if i < len(firewall_rule_types) else 'custom',
+                    action=firewall_rule_actions[i] if i < len(firewall_rule_actions) else 'ALLOW',
+                    destination=firewall_rule_destinations[i].strip() if i < len(firewall_rule_destinations) and firewall_rule_destinations[i].strip() else None,
+                    protocol=firewall_rule_protocols[i] if i < len(firewall_rule_protocols) else 'any',
+                    port_range=firewall_rule_ports[i].strip() if i < len(firewall_rule_ports) and firewall_rule_ports[i].strip() else None,
+                    priority=(i + 1) * 10,  # Set priority based on order
+                    is_active=True
+                )
+                db.session.add(firewall_rule)
+                firewall_rules_created += 1
+        
+        # Commit everything
         db.session.commit()
         generate_wg0_conf()
         
-        flash(f'Peer created successfully with IP {assigned_ip}', 'success')
+        success_msg = f'Peer created successfully with IP {assigned_ip}'
+        if ip_data:
+            success_msg += f' and {len(ip_data)} additional allowed IP(s)'
+        if firewall_rules_created > 0:
+            success_msg += f' and {firewall_rules_created} firewall rule(s)'
+        flash(success_msg, 'success')
         return redirect(url_for('list_peers'))
         
     except Exception as e:
+        db.session.rollback()
         flash(f'Error creating peer: {str(e)}', 'error')
         return render_template('peers/create.html'), 500
 
@@ -122,14 +179,26 @@ def edit_peer(peer_id):
 def update_peer(peer_id):
     try:
         peer = Peer.query.get_or_404(peer_id)
-        data = request.form
+        data = dict(request.form)
         
-        # Validate input data
-        validation_errors = validate_peer_data(data, peer_id)
-        if validation_errors:
-            for error in validation_errors:
-                flash(error, 'error')
-            return render_template('peers/edit.html', peer=peer), 400
+        # Get allowed IP networks and descriptions as lists
+        allowed_ip_networks = request.form.getlist('allowed_ip_networks[]')
+        allowed_ip_descriptions = request.form.getlist('allowed_ip_descriptions[]')
+        
+        # Filter out empty entries and pair networks with descriptions
+        ip_data = []
+        for i, network in enumerate(allowed_ip_networks):
+            network = network.strip()
+            if network:  # Only add non-empty networks
+                description = allowed_ip_descriptions[i].strip() if i < len(allowed_ip_descriptions) else ""
+                ip_data.append((network, description))
+
+        # Validate required fields
+        required_fields = ['name', 'public_key']
+        for field in required_fields:
+            if not data.get(field) or not data.get(field).strip():
+                flash(f'{field.replace("_", " ").title()} is required', 'error')
+                return render_template('peers/edit.html', peer=peer), 400
 
         # Check for existing peer with same name (excluding current peer)
         existing_peer = Peer.query.filter_by(name=data['name']).first()
@@ -143,26 +212,76 @@ def update_peer(peer_id):
             flash('Peer with this public key already exists', 'error')
             return render_template('peers/edit.html', peer=peer), 400
 
-        # Check for existing peer with same allowed IPs (excluding current peer)
-        existing_peer = Peer.query.filter_by(allowed_ips=data['allowed_ips']).first()
-        if existing_peer and existing_peer.id != peer_id:
-            flash('Peer with this IP range already exists', 'error')
-            return render_template('peers/edit.html', peer=peer), 400
+        # Validate allowed IP networks if provided
+        if ip_data:
+            networks_only = [network for network, desc in ip_data]
+            is_valid, errors = validate_multiple_allowed_ips(networks_only, peer_id)
+            if not is_valid:
+                for error in errors:
+                    flash(error, 'error')
+                return render_template('peers/edit.html', peer=peer), 400
 
-        # Update peer data
+        # Update peer basic data
         peer.name = data['name']
         peer.public_key = data['public_key']
-        peer.allowed_ips = data['allowed_ips']
         peer.endpoint = data.get('endpoint') if data.get('endpoint') else None
         peer.persistent_keepalive = int(data['persistent_keepalive']) if data.get('persistent_keepalive') else None
+        
+        # Remove existing allowed IPs for this peer
+        AllowedIP.query.filter_by(peer_id=peer_id).delete()
+        
+        # Create new AllowedIP objects
+        for network, description in ip_data:
+            allowed_ip = AllowedIP(
+                peer_id=peer.id,
+                ip_network=network,
+                description=description if description else None
+            )
+            db.session.add(allowed_ip)
+        
+        # Process Firewall Rules
+        firewall_rule_names = request.form.getlist('firewall_rule_names[]')
+        firewall_rule_actions = request.form.getlist('firewall_rule_actions[]')
+        firewall_rule_types = request.form.getlist('firewall_rule_types[]')
+        firewall_rule_destinations = request.form.getlist('firewall_rule_destinations[]')
+        firewall_rule_protocols = request.form.getlist('firewall_rule_protocols[]')
+        firewall_rule_ports = request.form.getlist('firewall_rule_ports[]')
+        
+        # Remove existing firewall rules for this peer
+        FirewallRule.query.filter_by(peer_id=peer_id).delete()
+        
+        # Create new firewall rules
+        firewall_rules_created = 0
+        for i, rule_name in enumerate(firewall_rule_names):
+            rule_name = rule_name.strip()
+            if rule_name:  # Only create rules with names
+                firewall_rule = FirewallRule(
+                    peer_id=peer.id,
+                    name=rule_name,
+                    rule_type=firewall_rule_types[i] if i < len(firewall_rule_types) else 'custom',
+                    action=firewall_rule_actions[i] if i < len(firewall_rule_actions) else 'ALLOW',
+                    destination=firewall_rule_destinations[i].strip() if i < len(firewall_rule_destinations) and firewall_rule_destinations[i].strip() else None,
+                    protocol=firewall_rule_protocols[i] if i < len(firewall_rule_protocols) else 'any',
+                    port_range=firewall_rule_ports[i].strip() if i < len(firewall_rule_ports) and firewall_rule_ports[i].strip() else None,
+                    priority=(i + 1) * 10,  # Set priority based on order
+                    is_active=True
+                )
+                db.session.add(firewall_rule)
+                firewall_rules_created += 1
         
         db.session.commit()
         generate_wg0_conf()
         
-        flash('Peer updated successfully', 'success')
+        success_msg = 'Peer updated successfully'
+        if ip_data:
+            success_msg += f' with {len(ip_data)} allowed IP(s)'
+        if firewall_rules_created > 0:
+            success_msg += f' and {firewall_rules_created} firewall rule(s)'
+        flash(success_msg, 'success')
         return redirect(url_for('show_peer', peer_id=peer_id))
         
     except Exception as e:
+        db.session.rollback()
         flash(f'Error updating peer: {str(e)}', 'error')
         return render_template('peers/edit.html', peer=peer), 500
 
@@ -219,6 +338,24 @@ PersistentKeepalive = {peer.persistent_keepalive or 25}
     response = Response(config, mimetype='text/plain')
     response.headers["Content-Disposition"] = f"attachment; filename={peer.name}_wg0.conf"
     return response
+
+@app.route('/peers/<int:peer_id>/qrcode', methods=['GET'])
+def get_peer_qrcode(peer_id):
+    """Generate QR code for peer configuration"""
+    try:
+        peer = Peer.query.get_or_404(peer_id)
+        qr_code_data = generate_peer_qr_code(peer_id)
+        
+        return jsonify({
+            'status': 'success',
+            'peer_name': peer.name,
+            'qr_code': qr_code_data
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error generating QR code: {str(e)}'
+        }), 500
 
 @app.route('/peers/<int:peer_id>/toggle', methods=['POST'])
 def toggle_peer_status(peer_id):
@@ -518,3 +655,256 @@ def list_peers_json():
 def download_config(peer_name):
     peer = Peer.query.filter_by(name=peer_name).first_or_404()
     return redirect(url_for('download_peer_config', peer_id=peer.id))
+
+# Firewall/iptables Management Routes
+@app.route('/api/v1/firewall/status', methods=['GET'])
+def api_firewall_status():
+    """Check iptables access and get current status"""
+    access_check = validate_iptables_access()
+    current_rules = get_current_iptables_rules()
+    
+    return jsonify({
+        'status': 'success',
+        'iptables_access': access_check,
+        'current_rules': current_rules
+    })
+
+@app.route('/api/v1/firewall/rules/generate', methods=['GET'])
+def api_generate_firewall_rules():
+    """Generate iptables rules without applying them (dry run)"""
+    peer_id = request.args.get('peer_id', type=int)
+    
+    try:
+        rules = generate_iptables_rules(peer_id)
+        return jsonify({
+            'status': 'success',
+            'rules': rules,
+            'message': f'Generated {len(rules)} rules'
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error generating rules: {str(e)}'
+        }), 500
+
+@app.route('/api/v1/firewall/rules/apply', methods=['POST'])
+def api_apply_firewall_rules():
+    """Apply iptables rules to the system"""
+    data = request.get_json() or {}
+    peer_id = data.get('peer_id')
+    dry_run = data.get('dry_run', False)
+    
+    try:
+        result = apply_iptables_rules(peer_id, dry_run)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error applying rules: {str(e)}'
+        }), 500
+
+@app.route('/api/v1/firewall/backup', methods=['POST'])
+def api_backup_firewall_rules():
+    """Create a backup of current iptables rules"""
+    try:
+        result = backup_iptables_rules()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error creating backup: {str(e)}'
+        }), 500
+
+@app.route('/api/v1/firewall/restore', methods=['POST'])
+def api_restore_firewall_rules():
+    """Restore iptables rules from backup"""
+    data = request.get_json()
+    if not data or 'backup_file' not in data:
+        return jsonify({
+            'status': 'error',
+            'message': 'backup_file is required'
+        }), 400
+    
+    try:
+        result = restore_iptables_rules(data['backup_file'])
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error restoring backup: {str(e)}'
+        }), 500
+
+# Firewall Rules CRUD API
+@app.route('/api/v1/peers/<int:peer_id>/firewall-rules', methods=['GET'])
+def api_get_peer_firewall_rules(peer_id):
+    """Get all firewall rules for a specific peer"""
+    peer = Peer.query.get(peer_id)
+    if not peer:
+        return jsonify({
+            'status': 'error',
+            'message': 'Peer not found'
+        }), 404
+    
+    rules = FirewallRule.query.filter_by(peer_id=peer_id).order_by(FirewallRule.priority).all()
+    
+    return jsonify({
+        'status': 'success',
+        'data': [{
+            'id': rule.id,
+            'name': rule.name,
+            'description': rule.description,
+            'rule_type': rule.rule_type,
+            'action': rule.action,
+            'source': rule.source,
+            'destination': rule.destination,
+            'protocol': rule.protocol,
+            'port_range': rule.port_range,
+            'priority': rule.priority,
+            'is_active': rule.is_active,
+            'created_at': rule.created_at.isoformat(),
+            'updated_at': rule.updated_at.isoformat()
+        } for rule in rules]
+    })
+
+@app.route('/api/v1/peers/<int:peer_id>/firewall-rules', methods=['POST'])
+def api_create_firewall_rule(peer_id):
+    """Create a new firewall rule for a peer"""
+    peer = Peer.query.get(peer_id)
+    if not peer:
+        return jsonify({
+            'status': 'error',
+            'message': 'Peer not found'
+        }), 404
+    
+    data = request.get_json()
+    if not data:
+        return jsonify({
+            'status': 'error',
+            'message': 'Invalid JSON data'
+        }), 400
+    
+    # Validate required fields
+    required_fields = ['name', 'rule_type', 'action']
+    for field in required_fields:
+        if not data.get(field):
+            return jsonify({
+                'status': 'error',
+                'message': f'{field} is required'
+            }), 400
+    
+    try:
+        new_rule = FirewallRule(
+            peer_id=peer_id,
+            name=data['name'],
+            description=data.get('description'),
+            rule_type=data['rule_type'],
+            action=data['action'],
+            source=data.get('source'),
+            destination=data.get('destination'),
+            protocol=data.get('protocol', 'any'),
+            port_range=data.get('port_range', 'any'),
+            priority=data.get('priority', 100),
+            is_active=data.get('is_active', True)
+        )
+        
+        db.session.add(new_rule)
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Firewall rule created successfully',
+            'data': {
+                'id': new_rule.id,
+                'name': new_rule.name,
+                'rule_type': new_rule.rule_type,
+                'action': new_rule.action
+            }
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': f'Error creating rule: {str(e)}'
+        }), 500
+
+@app.route('/api/v1/firewall-rules/<int:rule_id>', methods=['PUT'])
+def api_update_firewall_rule(rule_id):
+    """Update a firewall rule"""
+    rule = FirewallRule.query.get(rule_id)
+    if not rule:
+        return jsonify({
+            'status': 'error',
+            'message': 'Firewall rule not found'
+        }), 404
+    
+    data = request.get_json()
+    if not data:
+        return jsonify({
+            'status': 'error',
+            'message': 'Invalid JSON data'
+        }), 400
+    
+    try:
+        # Update fields
+        if 'name' in data:
+            rule.name = data['name']
+        if 'description' in data:
+            rule.description = data['description']
+        if 'rule_type' in data:
+            rule.rule_type = data['rule_type']
+        if 'action' in data:
+            rule.action = data['action']
+        if 'source' in data:
+            rule.source = data['source']
+        if 'destination' in data:
+            rule.destination = data['destination']
+        if 'protocol' in data:
+            rule.protocol = data['protocol']
+        if 'port_range' in data:
+            rule.port_range = data['port_range']
+        if 'priority' in data:
+            rule.priority = data['priority']
+        if 'is_active' in data:
+            rule.is_active = data['is_active']
+        
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Firewall rule updated successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': f'Error updating rule: {str(e)}'
+        }), 500
+
+@app.route('/api/v1/firewall-rules/<int:rule_id>', methods=['DELETE'])
+def api_delete_firewall_rule(rule_id):
+    """Delete a firewall rule"""
+    rule = FirewallRule.query.get(rule_id)
+    if not rule:
+        return jsonify({
+            'status': 'error',
+            'message': 'Firewall rule not found'
+        }), 404
+    
+    try:
+        rule_name = rule.name
+        db.session.delete(rule)
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Firewall rule "{rule_name}" deleted successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': f'Error deleting rule: {str(e)}'
+        }), 500

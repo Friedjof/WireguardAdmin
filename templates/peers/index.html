@@ -125,6 +125,9 @@
                             <a href="{{ url_for('api_list_peers') }}" class="btn btn-outline-secondary btn-sm" target="_blank">
                                 <i class="fas fa-code me-1"></i>View API
                             </a>
+                            <button class="btn btn-warning btn-sm" onclick="showFirewallManagement()">
+                                <i class="fas fa-shield-alt me-1"></i>Manage Firewall
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -143,4 +146,199 @@
         </a>
     </div>
 {% endif %}
+
+<!-- Firewall Management Modal -->
+<div class="modal fade" id="firewallModal" tabindex="-1" aria-labelledby="firewallModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="firewallModalLabel">
+                    <i class="fas fa-shield-alt me-2"></i>Firewall Management
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="firewallStatus" class="mb-3">
+                    <div class="d-flex justify-content-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-cogs me-1"></i>Actions</h6>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-info btn-sm" onclick="previewAllRules()">
+                                <i class="fas fa-eye me-1"></i>Preview All Rules
+                            </button>
+                            <button class="btn btn-warning btn-sm" onclick="applyAllRules(true)">
+                                <i class="fas fa-play me-1"></i>Test Apply All
+                            </button>
+                            <button class="btn btn-success btn-sm" onclick="applyAllRules(false)">
+                                <i class="fas fa-check me-1"></i>Apply All Rules
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="backupRules()">
+                                <i class="fas fa-save me-1"></i>Backup Current Rules
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-list me-1"></i>Current iptables Rules</h6>
+                        <div id="currentRules" class="border p-2 bg-light" style="height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.8em;">
+                            Loading current rules...
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="refreshFirewallStatus()">
+                    <i class="fas fa-sync me-1"></i>Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function showFirewallManagement() {
+    const modal = new bootstrap.Modal(document.getElementById('firewallModal'));
+    modal.show();
+    
+    await refreshFirewallStatus();
+}
+
+async function refreshFirewallStatus() {
+    try {
+        document.getElementById('firewallStatus').innerHTML = `
+            <div class="d-flex justify-content-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        `;
+        
+        const response = await fetch('/api/v1/firewall/status');
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            const accessStatus = data.iptables_access.status === 'success' ? 
+                '<span class="badge bg-success">✓ iptables Access OK</span>' : 
+                '<span class="badge bg-danger">✗ No iptables Access</span>';
+            
+            document.getElementById('firewallStatus').innerHTML = `
+                <div class="alert alert-info">
+                    ${accessStatus}
+                    <p class="mb-0 mt-2">${data.iptables_access.message}</p>
+                </div>
+            `;
+            
+            // Update current rules
+            if (data.current_rules.status === 'success') {
+                document.getElementById('currentRules').textContent = data.current_rules.rules;
+            } else {
+                document.getElementById('currentRules').textContent = 'Error loading rules: ' + data.current_rules.message;
+            }
+        } else {
+            document.getElementById('firewallStatus').innerHTML = `
+                <div class="alert alert-danger">Error loading firewall status</div>
+            `;
+        }
+    } catch (error) {
+        document.getElementById('firewallStatus').innerHTML = `
+            <div class="alert alert-danger">Error: ${error.message}</div>
+        `;
+    }
+}
+
+async function previewAllRules() {
+    try {
+        const response = await fetch('/api/v1/firewall/rules/generate');
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            const rulesText = data.rules.join('\\n');
+            alert('Generated iptables rules for all peers:\\n\\n' + rulesText);
+        } else {
+            alert('Error generating rules: ' + data.message);
+        }
+    } catch (error) {
+        alert('Error previewing rules: ' + error.message);
+    }
+}
+
+async function applyAllRules(dryRun = false) {
+    const action = dryRun ? 'test' : 'apply';
+    const confirmed = confirm(`Are you sure you want to ${action} firewall rules for ALL peers? This will modify system iptables.`);
+    
+    if (!confirmed) return;
+    
+    try {
+        const button = event.target;
+        const originalText = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processing...';
+        
+        const response = await fetch('/api/v1/firewall/rules/apply', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                dry_run: dryRun
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            if (dryRun) {
+                alert('Dry run completed successfully:\\n\\n' + (data.rules ? data.rules.join('\\n') : data.message));
+            } else {
+                alert('Firewall rules applied successfully!\\n\\n' + data.message);
+                await refreshFirewallStatus(); // Refresh the current rules display
+            }
+        } else {
+            alert('Error: ' + data.message);
+        }
+    } catch (error) {
+        alert('Error applying rules: ' + error.message);
+    } finally {
+        const button = event.target;
+        button.disabled = false;
+        button.innerHTML = originalText;
+    }
+}
+
+async function backupRules() {
+    try {
+        const button = event.target;
+        const originalText = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Creating backup...';
+        
+        const response = await fetch('/api/v1/firewall/backup', {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            alert('Backup created successfully!\\n\\nFile: ' + data.backup_file);
+        } else {
+            alert('Error creating backup: ' + data.message);
+        }
+    } catch (error) {
+        alert('Error creating backup: ' + error.message);
+    } finally {
+        const button = event.target;
+        button.disabled = false;
+        button.innerHTML = originalText;
+    }
+}
+</script>
 {% endblock %}
