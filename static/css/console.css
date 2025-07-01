@@ -79,3 +79,59 @@
 .terminal-path {
     color: #00aaff;
 }
+
+/* Peer Toggle Switch Styling */
+.peer-toggle {
+    width: 3rem !important;
+    height: 1.5rem !important;
+    border-radius: 1rem !important;
+    position: relative !important;
+    transition: all 0.3s ease !important;
+}
+
+.peer-toggle:checked {
+    background-color: #28a745 !important; /* Green when active */
+    border-color: #28a745 !important;
+}
+
+.peer-toggle:not(:checked) {
+    background-color: #fd7e14 !important; /* Orange when inactive */
+    border-color: #fd7e14 !important;
+}
+
+.peer-toggle:focus {
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25) !important;
+}
+
+.peer-toggle:not(:checked):focus {
+    box-shadow: 0 0 0 0.2rem rgba(253, 126, 20, 0.25) !important;
+}
+
+.peer-toggle:disabled {
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+}
+
+/* Enhance the labels */
+.peer-status-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.3s ease;
+}
+
+.peer-status-label:hover {
+    opacity: 0.8;
+}
+
+/* Animation for toggle state changes */
+@keyframes toggleSuccess {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.peer-toggle.toggle-success {
+    animation: toggleSuccess 0.3s ease;
+}

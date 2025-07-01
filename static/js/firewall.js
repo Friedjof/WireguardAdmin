@@ -3,6 +3,7 @@
 // Global variables
 let firewallRuleCounter = 0;
 
+// Updated templates to match new enum values
 const firewallTemplates = {
     unrestricted: {
         name: 'Unrestricted Access',
@@ -11,33 +12,97 @@ const firewallTemplates = {
     internet_only: {
         name: 'Internet Only',
         rules: [
-            { name: 'Allow Internet', type: 'internet', action: 'ALLOW', destination: '0.0.0.0/0', protocol: 'any', port: 'any' },
-            { name: 'Deny Peer Communication', type: 'peer_comm', action: 'DENY', destination: '10.0.0.0/24', protocol: 'any', port: 'any' }
+            { name: 'Allow Internet', type: 'internet', action: 'ALLOW', destination: '', protocol: 'any', port: 'any' },
+            { name: 'Deny Peer Communication', type: 'peer_comm', action: 'DENY', destination: '', protocol: 'any', port: 'any' }
         ]
     },
     restricted: {
         name: 'Restricted Access',
         rules: [
-            { name: 'Allow DNS', type: 'port', action: 'ALLOW', destination: 'any', protocol: 'udp', port: '53' },
-            { name: 'Allow HTTP/HTTPS', type: 'port', action: 'ALLOW', destination: 'any', protocol: 'tcp', port: '80,443' }
+            { name: 'Allow DNS', type: 'port', action: 'ALLOW', destination: '8.8.8.8/32', protocol: 'udp', port: '53' },
+            { name: 'Allow HTTP/HTTPS', type: 'port', action: 'ALLOW', destination: '', protocol: 'tcp', port: '80,443' }
         ]
     },
     admin: {
         name: 'Administrator',
         rules: [
-            { name: 'Allow All', type: 'custom', action: 'ALLOW', destination: '0.0.0.0/0', protocol: 'any', port: 'any' }
+            { name: 'Allow All', type: 'custom', action: 'ALLOW', destination: '', protocol: 'any', port: 'any' }
         ]
     },
     guest: {
         name: 'Guest Access',
         rules: [
-            { name: 'Allow DNS', type: 'port', action: 'ALLOW', destination: 'any', protocol: 'udp', port: '53' },
-            { name: 'Allow HTTP/HTTPS', type: 'port', action: 'ALLOW', destination: 'any', protocol: 'tcp', port: '80,443' },
-            { name: 'Deny Peer Communication', type: 'peer_comm', action: 'DENY', destination: '10.0.0.0/24', protocol: 'any', port: 'any' },
-            { name: 'Deny SSH', type: 'port', action: 'DENY', destination: 'any', protocol: 'tcp', port: '22' }
+            { name: 'Allow DNS', type: 'port', action: 'ALLOW', destination: '8.8.8.8/32', protocol: 'udp', port: '53' },
+            { name: 'Allow HTTP/HTTPS', type: 'port', action: 'ALLOW', destination: '', protocol: 'tcp', port: '80,443' },
+            { name: 'Block Everything Else', type: 'custom', action: 'DENY', destination: '', protocol: 'any', port: 'any' }
         ]
     }
 };
+
+// Validation functions for frontend
+function validatePeerName(name) {
+    const pattern = /^[a-zA-Z0-9_-]+$/;
+    return pattern.test(name);
+}
+
+function validateWireGuardKey(key) {
+    if (!key || key.length !== 44) return false;
+    const pattern = /^[A-Za-z0-9+/]{43}=$/;
+    return pattern.test(key);
+}
+
+function validateIPAddress(ip) {
+    if (!ip) return false;
+    // Simple IP validation - could be enhanced
+    const parts = ip.split('.');
+    if (parts.length !== 4) return false;
+    return parts.every(part => {
+        const num = parseInt(part);
+        return !isNaN(num) && num >= 0 && num <= 255;
+    });
+}
+
+function validateIPNetwork(network) {
+    if (!network) return false;
+    if (network.includes('/')) {
+        const [ip, cidr] = network.split('/');
+        const cidrNum = parseInt(cidr);
+        return validateIPAddress(ip) && !isNaN(cidrNum) && cidrNum >= 0 && cidrNum <= 32;
+    }
+    return validateIPAddress(network);
+}
+
+function validatePortRange(portRange) {
+    if (!portRange || portRange === 'any') return true;
+    
+    // Single port
+    if (!portRange.includes('-') && !portRange.includes(',')) {
+        const port = parseInt(portRange);
+        return !isNaN(port) && port >= 1 && port <= 65535;
+    }
+    
+    // Port range (e.g., "80-443")
+    if (portRange.includes('-')) {
+        const [start, end] = portRange.split('-');
+        const startPort = parseInt(start);
+        const endPort = parseInt(end);
+        return !isNaN(startPort) && !isNaN(endPort) && 
+               startPort >= 1 && startPort <= 65535 &&
+               endPort >= 1 && endPort <= 65535 &&
+               startPort <= endPort;
+    }
+    
+    // Multiple ports (e.g., "80,443,8080")
+    if (portRange.includes(',')) {
+        const ports = portRange.split(',');
+        return ports.every(port => {
+            const portNum = parseInt(port.trim());
+            return !isNaN(portNum) && portNum >= 1 && portNum <= 65535;
+        });
+    }
+    
+    return false;
+}
 
 function applyFirewallTemplate() {
     const templateSelect = document.getElementById('firewall_template');

@@ -59,7 +59,10 @@ Add New Peer - WireGuard Manager
                                required 
                                placeholder="e.g., john-laptop, alice-phone"
                                pattern="[a-zA-Z0-9_-]+"
-                               title="Only letters, numbers, hyphens and underscores allowed">
+                               title="Only letters, numbers, hyphens and underscores allowed"
+                               maxlength="100"
+                               onblur="validateField(this)"
+                               oninput="clearValidationError(this)">
                         <div class="form-text">A unique name to identify this peer (alphanumeric, -, _ only)</div>
                     </div>
 
@@ -74,7 +77,10 @@ Add New Peer - WireGuard Manager
                                    name="public_key" 
                                    value="{% if peer %}{{ peer.public_key }}{% endif %}"
                                    required 
-                                   placeholder="e.g., LSsHed2xa2wxNymEit4kiOpj3kuaDuf0q0VohjRkAXQ=">
+                                   placeholder="e.g., LSsHed2xa2wxNymEit4kiOpj3kuaDuf0q0VohjRkAXQ="
+                                   maxlength="44"
+                                   onblur="validateField(this)"
+                                   oninput="clearValidationError(this)">
                             {% if peer %}
                             <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard('{{ peer.public_key }}', this)" title="Copy current key">
                                 <i class="fas fa-copy"></i>

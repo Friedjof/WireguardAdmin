@@ -20,7 +20,9 @@ function addIpField(value = '', description = '') {
                        name="allowed_ip_networks[]" 
                        placeholder="e.g., 192.168.1.0/24, 172.16.0.0/16"
                        value="${value}"
-                       onblur="validateIpField(this)">
+                       onblur="validateIpField(this)"
+                       oninput="clearValidationError(this)"
+                       maxlength="43">
                 <div class="invalid-feedback"></div>
             </div>
             <div class="col-3">
@@ -28,7 +30,8 @@ function addIpField(value = '', description = '') {
                        class="form-control" 
                        name="allowed_ip_descriptions[]" 
                        placeholder="Description (optional)"
-                       value="${description}">
+                       value="${description}"
+                       maxlength="255">
             </div>
             <div class="col-1">
                 <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removeIpField('${fieldId}')" title="Remove">
@@ -48,46 +51,63 @@ function removeIpField(fieldId) {
     }
 }
 
+// Clear validation error styling
+function clearValidationError(input) {
+    input.classList.remove('is-invalid', 'is-valid');
+    const feedback = input.parentNode.querySelector('.invalid-feedback');
+    if (feedback) {
+        feedback.textContent = '';
+    }
+}
+
 function validateIpField(input) {
     const value = input.value.trim();
     const feedback = input.parentNode.querySelector('.invalid-feedback');
     
     // Clear previous validation
     input.classList.remove('is-valid', 'is-invalid');
-    feedback.textContent = '';
+    if (feedback) feedback.textContent = '';
     
     if (!value) {
-        return; // Empty is allowed
+        return true; // Empty is allowed
     }
     
-    // Basic CIDR validation
-    const cidrPattern = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}$/;
-    const ipPattern = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
-    
-    if (!cidrPattern.test(value) && !ipPattern.test(value)) {
-        input.classList.add('is-invalid');
-        feedback.textContent = 'Use CIDR notation (e.g., 192.168.1.0/24) or single IP';
-        return false;
-    }
-    
-    // Validate IP parts
-    const parts = value.split('/')[0].split('.');
-    for (let part of parts) {
-        const num = parseInt(part);
-        if (num < 0 || num > 255) {
+    // Use enhanced validation from firewall.js
+    if (typeof validateIPNetwork === 'function') {
+        const isValid = validateIPNetwork(value);
+        if (!isValid) {
             input.classList.add('is-invalid');
-            feedback.textContent = 'Invalid IP address';
+            if (feedback) feedback.textContent = 'Invalid IP network format (use CIDR notation like 192.168.1.0/24)';
             return false;
         }
-    }
-    
-    // Validate CIDR prefix if present
-    if (value.includes('/')) {
-        const prefix = parseInt(value.split('/')[1]);
-        if (prefix < 0 || prefix > 32) {
+    } else {
+        // Fallback validation
+        const cidrPattern = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(\/\d{1,2})?$/;
+        if (!cidrPattern.test(value)) {
             input.classList.add('is-invalid');
-            feedback.textContent = 'CIDR prefix must be between 0 and 32';
+            if (feedback) feedback.textContent = 'Use CIDR notation (e.g., 192.168.1.0/24) or single IP';
             return false;
+        }
+        
+        // Validate IP parts
+        const parts = value.split('/')[0].split('.');
+        for (let part of parts) {
+            const num = parseInt(part);
+            if (num < 0 || num > 255) {
+                input.classList.add('is-invalid');
+                if (feedback) feedback.textContent = 'Invalid IP address';
+                return false;
+            }
+        }
+        
+        // Validate CIDR prefix if present
+        if (value.includes('/')) {
+            const prefix = parseInt(value.split('/')[1]);
+            if (prefix < 0 || prefix > 32) {
+                input.classList.add('is-invalid');
+                if (feedback) feedback.textContent = 'CIDR prefix must be between 0 and 32';
+                return false;
+            }
         }
     }
     
@@ -95,7 +115,7 @@ function validateIpField(input) {
     const vpnSubnet = getVpnSubnet();
     if (value.startsWith('10.0.0.') && vpnSubnet.startsWith('10.0.0.')) {
         input.classList.add('is-invalid');
-        feedback.textContent = 'IP cannot be in VPN subnet (' + vpnSubnet + ')';
+        if (feedback) feedback.textContent = 'IP cannot be in VPN subnet (' + vpnSubnet + ')';
         return false;
     }
     
@@ -103,7 +123,7 @@ function validateIpField(input) {
     return true;
 }
 
-// Form Validation Functions
+// Enhanced Form Validation Functions
 function validateForm() {
     const name = document.getElementById('name').value;
     const publicKey = document.getElementById('public_key').value;
@@ -112,13 +132,21 @@ function validateForm() {
     
     let errors = [];
     
-    // Validate name
-    if (!name.match(/^[a-zA-Z0-9_-]+$/)) {
+    // Validate name using enhanced validation
+    if (typeof validatePeerName === 'function') {
+        if (!validatePeerName(name)) {
+            errors.push('Name can only contain letters, numbers, hyphens and underscores');
+        }
+    } else if (!name.match(/^[a-zA-Z0-9_-]+$/)) {
         errors.push('Name can only contain letters, numbers, hyphens and underscores');
     }
     
-    // Validate public key
-    if (publicKey.length !== 44 || !publicKey.match(/^[A-Za-z0-9+/]{43}=$/)) {
+    // Validate public key using enhanced validation
+    if (typeof validateWireGuardKey === 'function') {
+        if (!validateWireGuardKey(publicKey)) {
+            errors.push('Invalid WireGuard public key format (must be 44 characters base64)');
+        }
+    } else if (publicKey.length !== 44 || !publicKey.match(/^[A-Za-z0-9+/]{43}=$/)) {
         errors.push('Invalid WireGuard public key format');
     }
     
@@ -134,17 +162,60 @@ function validateForm() {
     
     // Validate all IP fields
     const ipInputs = document.querySelectorAll('.ip-network-input');
+    let hasInvalidIPs = false;
     ipInputs.forEach(input => {
         if (input.value.trim() && !validateIpField(input)) {
-            errors.push('Fix IP validation errors');
+            hasInvalidIPs = true;
         }
     });
-    
-    if (errors.length === 0) {
-        alert('✅ All fields look valid!');
-    } else {
-        alert('❌ Validation errors:\n\n' + errors.join('\n'));
+    if (hasInvalidIPs) {
+        errors.push('Fix IP validation errors');
     }
+    
+    // Show validation results
+    if (errors.length === 0) {
+        showValidationSuccess();
+    } else {
+        showValidationErrors(errors);
+    }
+}
+
+function showValidationSuccess() {
+    const alert = document.createElement('div');
+    alert.className = 'alert alert-success alert-dismissible fade show mt-3';
+    alert.innerHTML = `
+        <i class="fas fa-check-circle me-1"></i>
+        <strong>Validation Passed!</strong> All fields are valid and ready for submission.
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    // Insert after the form
+    const form = document.querySelector('form');
+    form.parentNode.insertBefore(alert, form.nextSibling);
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 3000);
+}
+
+function showValidationErrors(errors) {
+    const alert = document.createElement('div');
+    alert.className = 'alert alert-danger alert-dismissible fade show mt-3';
+    alert.innerHTML = `
+        <i class="fas fa-exclamation-triangle me-1"></i>
+        <strong>Validation Failed!</strong> Please fix the following errors:
+        <ul class="mb-0 mt-2">
+            ${errors.map(error => `<li>${error}</li>`).join('')}
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    // Insert after the form
+    const form = document.querySelector('form');
+    form.parentNode.insertBefore(alert, form.nextSibling);
 }
 
 function validateField(field) {

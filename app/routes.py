@@ -394,6 +394,59 @@ def toggle_peer_status(peer_id):
         flash(f'Error toggling peer status: {str(e)}', 'error')
         return redirect(url_for('list_peers'))
 
+# API Routes for peer activation/deactivation
+@app.route('/api/v1/peers/<int:peer_id>/activate', methods=['POST'])
+def api_activate_peer(peer_id):
+    """Activate a peer and regenerate WireGuard configuration"""
+    try:
+        peer = Peer.query.get_or_404(peer_id)
+        
+        # Set peer as active
+        peer.is_active = True
+        db.session.commit()
+        
+        # Regenerate WireGuard configuration
+        generate_wg0_conf()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Peer "{peer.name}" activated successfully',
+            'is_active': True
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': f'Error activating peer: {str(e)}'
+        }), 500
+
+@app.route('/api/v1/peers/<int:peer_id>/deactivate', methods=['POST'])
+def api_deactivate_peer(peer_id):
+    """Deactivate a peer and regenerate WireGuard configuration"""
+    try:
+        peer = Peer.query.get_or_404(peer_id)
+        
+        # Set peer as inactive
+        peer.is_active = False
+        db.session.commit()
+        
+        # Regenerate WireGuard configuration
+        generate_wg0_conf()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Peer "{peer.name}" deactivated successfully',
+            'is_active': False
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': f'Error deactivating peer: {str(e)}'
+        }), 500
+
 # API Routes
 @app.route('/api/v1/peers', methods=['GET'])
 def api_list_peers():

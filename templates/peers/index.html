@@ -2,6 +2,10 @@
 
 {% block title %}Peers - WireGuard Manager{% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/console.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="fas fa-users me-2"></i>WireGuard Peers</h1>
@@ -31,11 +35,22 @@
                         {% for peer in peers %}
                         <tr>
                             <td>
-                                {% if peer.is_active %}
-                                    <span class="badge bg-success">Active</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">Inactive</span>
-                                {% endif %}
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input peer-toggle" 
+                                           type="checkbox" 
+                                           id="peer-toggle-{{ peer.id }}" 
+                                           data-peer-id="{{ peer.id }}"
+                                           data-peer-name="{{ peer.name }}"
+                                           {% if peer.is_active %}checked{% endif %}
+                                           onchange="togglePeerStatus(this)">
+                                    <label class="form-check-label peer-status-label" for="peer-toggle-{{ peer.id }}">
+                                        {% if peer.is_active %}
+                                            <span class="text-success fw-bold">Active</span>
+                                        {% else %}
+                                            <span class="text-warning fw-bold">Inactive</span>
+                                        {% endif %}
+                                    </label>
+                                </div>
                             </td>
                             <td>
                                 <strong>{{ peer.name }}</strong>
@@ -204,6 +219,88 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+async function togglePeerStatus(toggleElement) {
+    const peerId = toggleElement.dataset.peerId;
+    const peerName = toggleElement.dataset.peerName;
+    const isActive = toggleElement.checked;
+    const action = isActive ? 'activate' : 'deactivate';
+    const endpoint = isActive ? 'activate' : 'deactivate';
+    
+    // Disable the toggle during the request
+    toggleElement.disabled = true;
+    
+    try {
+        const response = await fetch(`/api/v1/peers/${peerId}/${endpoint}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        // Check if response is ok and has content
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const responseText = await response.text();
+        let data;
+        
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseError) {
+            // If JSON parsing fails, show the raw response
+            throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}`);
+        }
+        
+        if (data.status === 'success') {
+            // Update the label text and color
+            const label = document.querySelector(`label[for="peer-toggle-${peerId}"] span`);
+            if (isActive) {
+                label.textContent = 'Active';
+                label.className = 'text-success fw-bold';
+            } else {
+                label.textContent = 'Inactive';
+                label.className = 'text-warning fw-bold';
+            }
+            
+            // Show success message
+            showToast(`Peer "${peerName}" ${action}d successfully!`, 'success');
+        } else {
+            // Revert the toggle on error
+            toggleElement.checked = !isActive;
+            showToast(`Error ${action}ing peer: ${data.message || 'Unknown error'}`, 'danger');
+        }
+    } catch (error) {
+        // Revert the toggle on error
+        toggleElement.checked = !isActive;
+        showToast(`Error ${action}ing peer: ${error.message}`, 'danger');
+    } finally {
+        // Re-enable the toggle
+        toggleElement.disabled = false;
+    }
+}
+
+function showToast(message, type = 'info') {
+    // Simple toast implementation
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    toast.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.remove();
+        }
+    }, 5000);
+}
+</script>
 <script>
 async function showFirewallManagement() {
     const modal = new bootstrap.Modal(document.getElementById('firewallModal'));

@@ -369,19 +369,19 @@ def convert_firewall_rule_to_iptables(rule, peer_ip, vpn_interface='wg0'):
     # Destination IP
     if rule.destination:
         cmd_parts.extend(["-d", rule.destination])
-    elif rule.rule_type == 'internet':
+    elif rule.rule_type.value == 'internet':
         cmd_parts.extend(["-d", "0.0.0.0/0"])
-    elif rule.rule_type == 'peer_comm':
+    elif rule.rule_type.value == 'peer_comm':
         # Get VPN subnet for peer communication
         vpn_subnet = os.getenv("VPN_SUBNET", "10.0.0.0/24")
         cmd_parts.extend(["-d", vpn_subnet])
     
     # Protocol
-    if rule.protocol and rule.protocol != 'any':
-        cmd_parts.extend(["-p", rule.protocol])
+    if rule.protocol and rule.protocol.value != 'any':
+        cmd_parts.extend(["-p", rule.protocol.value])
         
         # Port range (only for TCP/UDP)
-        if rule.port_range and rule.port_range != 'any' and rule.protocol in ['tcp', 'udp']:
+        if rule.port_range and rule.port_range != 'any' and rule.protocol.value in ['tcp', 'udp']:
             if '-' in rule.port_range:
                 # Port range (e.g., "80-443")
                 cmd_parts.extend(["--dport", rule.port_range])
@@ -390,13 +390,13 @@ def convert_firewall_rule_to_iptables(rule, peer_ip, vpn_interface='wg0'):
                 cmd_parts.extend(["--dport", rule.port_range])
     
     # Interface constraints
-    if rule.rule_type == 'internet':
+    if rule.rule_type.value == 'internet':
         cmd_parts.extend(["-o", f"!{vpn_interface}"])  # Not going to VPN interface
     else:
         cmd_parts.extend(["-i", vpn_interface])  # Coming from VPN interface
     
     # Action
-    action = "ACCEPT" if rule.action == "ALLOW" else "DROP"
+    action = "ACCEPT" if rule.action.value == "ALLOW" else "DROP"
     cmd_parts.extend(["-j", action])
     
     # Add comment
