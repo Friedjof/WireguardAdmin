@@ -2,7 +2,7 @@ import os
 
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
-    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "sqlite:///wireguard.db")
+    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", f"sqlite:///{os.path.abspath('instance/wireguard.db')}")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SERVER_PUBLIC_KEY = os.getenv("SERVER_PUBLIC_KEY")
     VPN_SERVER_IP = os.getenv("VPN_SERVER_IP", "10.0.0.1")

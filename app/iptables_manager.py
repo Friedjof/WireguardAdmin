@@ -12,6 +12,13 @@ try:
     import iptc
     IPTABLES_AVAILABLE = True
 except ImportError:
+    # Create a mock iptc module to avoid import errors
+    class MockIptc:
+        class Rule:
+            def __init__(self):
+                pass
+        
+    iptc = MockIptc()
     IPTABLES_AVAILABLE = False
     logging.warning("python-iptables not available, falling back to subprocess")
 
@@ -80,7 +87,7 @@ class IptablesManager:
         except Exception as e:
             return {"status": "error", "message": f"Error getting iptables rules: {str(e)}"}
     
-    def _format_rule_for_display(self, rule: iptc.Rule, line_num: int) -> str:
+    def _format_rule_for_display(self, rule, line_num: int) -> str:
         """Format an iptables rule for display"""
         try:
             # Get counters
@@ -155,7 +162,7 @@ class IptablesManager:
         except Exception as e:
             return {"status": "error", "message": f"Error clearing rules: {str(e)}"}
     
-    def _is_wireguard_rule(self, rule: iptc.Rule) -> bool:
+    def _is_wireguard_rule(self, rule) -> bool:
         """Check if a rule is WireGuard-related"""
         try:
             # Check interfaces
@@ -421,8 +428,10 @@ class IptablesManager:
         
         return rules_added
     
-    def _create_iptables_rule_from_firewall_rule(self, fw_rule: FirewallRule, peer_ip: str) -> Optional[iptc.Rule]:
+    def _create_iptables_rule_from_firewall_rule(self, fw_rule: FirewallRule, peer_ip: str):
         """Create an iptables Rule object from a FirewallRule"""
+        if not IPTABLES_AVAILABLE:
+            return None
         try:
             rule = iptc.Rule()
             

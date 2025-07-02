@@ -14,7 +14,8 @@ class LiveStatusManager {
     start() {
         if (this.isRunning) return;
         
-        console.log('Starting live status updates...');
+        console.log('🔄 Starting HTTP live status updates...');
+        console.log('⚠️ NOTE: Using HTTP polling - WebSocket should be preferred!');
         this.isRunning = true;
         
         // Initial update

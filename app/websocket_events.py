@@ -14,9 +14,14 @@ def register_websocket_events(socketio, ws_manager):
     @socketio.on('connect')
     def handle_connect():
         """Handle client connection"""
+        print(f"🔌 New WebSocket connection from {request.remote_addr}")
         ws_manager.add_client(request.sid)
         emit('connection_status', {'status': 'connected', 'message': 'WebSocket connected'})
         print(f"✅ WebSocket client connected: {request.sid}")
+        
+        # Send initial status update to new client
+        print(f"📤 Sending initial status to new client {request.sid}")
+        ws_manager._emit_status_update()
 
     @socketio.on('disconnect')
     def handle_disconnect():

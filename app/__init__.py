@@ -15,12 +15,21 @@ db = SQLAlchemy(app)
 # Initialize SocketIO with eventlet for better WebSocket support
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-# Create database tables if they don't exist
-with app.app_context():
-    db.create_all()
+# Create database tables if they don't exist (only when running as main module)
+def init_db():
+    with app.app_context():
+        db.create_all()
+
+# Only initialize database if being run directly
+if __name__ == "__main__":
+    init_db()
 
 # Import routes to register them with the app
-from app import routes
+try:
+    from app import routes
+    print("✓ Routes imported successfully")
+except Exception as e:
+    print(f"⚠️  Warning: Could not import routes: {e}")
 
 # Import and initialize WebSocket manager
 from app.websocket_manager import init_websocket_manager

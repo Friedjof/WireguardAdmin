@@ -27,6 +27,7 @@ def parse_wg_show_output(output: str) -> Dict[str, Dict]:
         }
     }
     """
+    print(f"🔍 Parsing WireGuard output ({len(output)} chars)...")
     peers = {}
     current_peer = None
     
@@ -37,6 +38,7 @@ def parse_wg_show_output(output: str) -> Dict[str, Dict]:
             # New peer entry
             public_key = line.split('peer:')[1].strip()
             current_peer = public_key
+            print(f"  📋 Found peer: {public_key[:20]}...")
             peers[current_peer] = {
                 'endpoint': None,
                 'allowed_ips': [],
@@ -50,6 +52,7 @@ def parse_wg_show_output(output: str) -> Dict[str, Dict]:
         elif current_peer and line.startswith('endpoint:'):
             endpoint = line.split('endpoint:')[1].strip()
             peers[current_peer]['endpoint'] = endpoint
+            print(f"    🌐 Endpoint: {endpoint}")
             
         elif current_peer and line.startswith('allowed ips:'):
             allowed_ips = line.split('allowed ips:')[1].strip()
@@ -58,6 +61,7 @@ def parse_wg_show_output(output: str) -> Dict[str, Dict]:
             
         elif current_peer and line.startswith('latest handshake:'):
             handshake_str = line.split('latest handshake:')[1].strip()
+            print(f"    🤝 Latest handshake: {handshake_str}")
             if handshake_str and handshake_str != '(none)':
                 try:
                     # Parse different handshake formats
@@ -67,16 +71,27 @@ def parse_wg_show_output(output: str) -> Dict[str, Dict]:
                     else:
                         # Absolute timestamp format
                         peers[current_peer]['latest_handshake'] = datetime.now(timezone.utc)
-                except:
-                    pass
+                    
+                    # Determine if peer is connected (handshake within last 3 minutes)
+                    if peers[current_peer]['latest_handshake']:
+                        time_diff = datetime.now(timezone.utc) - peers[current_peer]['latest_handshake']
+                        peers[current_peer]['is_connected'] = time_diff.total_seconds() < 180
+                        peers[current_peer]['connection_duration_seconds'] = time_diff.total_seconds() if peers[current_peer]['is_connected'] else 0
+                        print(f"    🔗 Connection status: {'✅ Connected' if peers[current_peer]['is_connected'] else '❌ Disconnected'} (handshake {int(time_diff.total_seconds())}s ago)")
+                except Exception as e:
+                    print(f"    ⚠️ Error parsing handshake: {e}")
+            else:
+                print(f"    🤝 No handshake data available")
             
         elif current_peer and line.startswith('transfer:'):
             transfer_str = line.split('transfer:')[1].strip()
             # Format: "1.23 MiB received, 456.78 KiB sent"
+            print(f"    📊 Transfer: {transfer_str}")
             if transfer_str:
                 rx, tx = parse_transfer_data(transfer_str)
                 peers[current_peer]['transfer_rx'] = rx
                 peers[current_peer]['transfer_tx'] = tx
+                print(f"    📥 RX: {rx} bytes, 📤 TX: {tx} bytes")
                 
         elif current_peer and line.startswith('persistent keepalive:'):
             keepalive_str = line.split('persistent keepalive:')[1].strip()
@@ -88,8 +103,11 @@ def parse_wg_show_output(output: str) -> Dict[str, Dict]:
                 except:
                     pass
     
-    # Determine connection status based on handshake recency
+    # Final processing and connection status determination
+    print(f"🔧 Post-processing {len(peers)} peers...")
     for peer_key, peer_data in peers.items():
+        print(f"  📋 Processing peer: {peer_key[:20]}...")
+        
         if peer_data['latest_handshake']:
             time_diff = datetime.now(timezone.utc) - peer_data['latest_handshake']
             # Consider connected if handshake was within last 3 minutes
@@ -101,17 +119,22 @@ def parse_wg_show_output(output: str) -> Dict[str, Dict]:
                     # Endpoint format is typically "IP:PORT"
                     client_ip = peer_data['endpoint'].split(':')[0]
                     peer_data['client_ip'] = client_ip
+                    print(f"    🏠 Client IP extracted: {client_ip}")
                 except:
                     peer_data['client_ip'] = None
+                    print(f"    ⚠️ Could not extract client IP from endpoint: {peer_data['endpoint']}")
             else:
                 peer_data['client_ip'] = None
+                print(f"    ❌ No endpoint available")
                 
             # Calculate connection duration (approximate)
             peer_data['connection_duration_seconds'] = time_diff.total_seconds()
+            print(f"    ⏱️ Final connection status: {'✅ Connected' if peer_data['is_connected'] else '❌ Disconnected'}")
         else:
             peer_data['is_connected'] = False
             peer_data['client_ip'] = None
             peer_data['connection_duration_seconds'] = None
+            print(f"    ❌ No handshake - marked as disconnected")
     
     return peers
 
@@ -180,20 +203,34 @@ def get_wireguard_status(interface: str = 'wg0') -> Dict[str, Dict]:
     Returns peer connection information from 'wg show'
     """
     try:
+        print(f"🔍 Executing: wg show {interface}", flush=True)
         result = subprocess.run(
             ['wg', 'show', interface],
             capture_output=True,
             text=True,
             check=True
         )
-        return parse_wg_show_output(result.stdout)
-    except subprocess.CalledProcessError:
-        # Interface might not exist or wg command failed
+        print(f"✅ WireGuard command successful, output length: {len(result.stdout)} chars")
+        if result.stdout.strip():
+            print(f"📋 WireGuard output preview:\n{result.stdout[:200]}{'...' if len(result.stdout) > 200 else ''}")
+        else:
+            print("⚠️ WireGuard output is empty - no active peers or interface not configured")
+        
+        parsed_data = parse_wg_show_output(result.stdout)
+        print(f"📊 Parsed {len(parsed_data)} peers from WireGuard output")
+        
+        return parsed_data
+    except subprocess.CalledProcessError as e:
+        print(f"❌ WireGuard command failed (exit code {e.returncode}): {e.stderr}")
+        print(f"   Interface '{interface}' might not exist or wg command failed")
         return {}
     except FileNotFoundError:
-        # wg command not found
+        print("❌ WireGuard command 'wg' not found in PATH")
+        print("   Make sure WireGuard tools are installed")
         return {}
-    except Exception:
+    except Exception as e:
+        print(f"❌ Unexpected error getting WireGuard status: {e}")
+        return {}
         # Other errors
         return {}
 

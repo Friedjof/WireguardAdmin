@@ -35,10 +35,15 @@ class WebSocketManager {
 
     setupEventHandlers() {
         this.socket.on('connect', () => {
-            console.log('✅ WebSocket connected');
+            console.log('✅ WebSocket connected successfully!');
+            console.log('🔗 Socket ID:', this.socket.id);
             this.isConnected = true;
             this.reconnectAttempts = 0;
             this.showConnectionStatus('connected');
+            
+            // Log connection status for debugging
+            console.log('🌐 window.wsManager exists:', !!window.wsManager);
+            console.log('🌐 window.wsManager.isConnected:', window.wsManager?.isConnected);
         });
 
         this.socket.on('disconnect', () => {
@@ -53,10 +58,20 @@ class WebSocketManager {
         });
 
         this.socket.on('peer_status_update', (data) => {
+            console.log('📊 Received peer status update via WebSocket:', {
+                status: data.status,
+                total_peers: data.total_peers,
+                connected_peers: data.connected_peers,
+                peer_count: Object.keys(data.data || {}).length
+            });
+            
             if (data.status === 'success') {
                 this.updatePeerElements(data.data);
                 this.updateSummary(data.total_peers, data.connected_peers);
                 this.updateTrafficGraphs(data.data);
+                console.log('✅ UI updated with WebSocket data');
+            } else {
+                console.log('❌ WebSocket status update failed:', data.message);
             }
         });
 
@@ -498,12 +513,28 @@ let wsManager = null;
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔧 DOM ready, checking for peer elements...');
+    
+    const peerElements = document.querySelector('[data-peer-id]');
+    const connectionDots = document.querySelector('.connection-dot');
+    
+    console.log('🔍 Found peer elements:', !!peerElements);
+    console.log('🔍 Found connection dots:', !!connectionDots);
+    
     // Only start if we're on a page with peers
-    if (document.querySelector('[data-peer-id]') || document.querySelector('.connection-dot')) {
+    if (peerElements || connectionDots) {
+        console.log('✅ Peer elements found, initializing WebSocket manager...');
         wsManager = new WebSocketManager();
+        
+        // Set global reference immediately after creation
+        window.wsManager = wsManager;
+        console.log('🌐 window.wsManager set:', !!window.wsManager);
+        
         wsManager.connect();
         
-        console.log('🚀 WebSocket manager initialized');
+        console.log('🚀 WebSocket manager initialized and connecting...');
+    } else {
+        console.log('❌ No peer elements found, skipping WebSocket initialization');
     }
 });
 

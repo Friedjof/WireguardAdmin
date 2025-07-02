@@ -252,13 +252,19 @@ function togglePeerStatus(toggleElement) {
     toggleElement.disabled = true;
     
     // Use WebSocket if available, fallback to HTTP
+    console.log('🔄 Toggling peer status for peer', peerId);
+    console.log('🌐 window.wsManager exists:', !!window.wsManager);
+    console.log('🌐 wsManager.isConnected:', window.wsManager?.isConnected);
+    
     if (window.wsManager && window.wsManager.isConnected) {
+        console.log('✅ Using WebSocket for peer toggle');
         if (isActive) {
             window.wsManager.activatePeer(peerId);
         } else {
             window.wsManager.deactivatePeer(peerId);
         }
     } else {
+        console.log('⚠️ Falling back to HTTP API for peer toggle');
         // Fallback to HTTP API
         togglePeerStatusHTTP(toggleElement, peerId, peerName, isActive, action);
     }

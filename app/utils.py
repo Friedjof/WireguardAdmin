@@ -6,7 +6,10 @@ import ipaddress
 import qrcode
 import io
 import base64
-from app.iptables_manager import get_iptables_manager
+try:
+    from app.iptables_manager import get_iptables_manager
+except (ImportError, AttributeError):
+    from app.iptables_stub import get_iptables_manager
 
 def generate_wg0_conf():
     server_private_key = os.getenv("SERVER_PRIVATE_KEY")

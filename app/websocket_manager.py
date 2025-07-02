@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from flask import request
 from flask_socketio import emit
 import eventlet
+from app import socketio, db
+from app import app
 from app.models import Peer
 from app.wireguard_status import get_wireguard_status, format_bytes, format_time_ago, format_duration
 
@@ -59,12 +61,11 @@ class WebSocketManager:
         try:
             # Get WireGuard status
             wg_status = get_wireguard_status()
-            
+
             # Get all peers from database
-            from app import db
-            with db.app.app_context():
+            with app.app_context():
                 peers = Peer.query.all()
-                
+
                 # Combine database info with live status
                 peer_status = {}
                 current_time = datetime.now(timezone.utc)
@@ -142,14 +143,20 @@ class WebSocketManager:
                     }
                 
                 # Emit to all connected clients
-                from app import socketio
-                socketio.emit('peer_status_update', {
+                try:
+                    print(f"🔧 About to emit peer_status_update...", flush=True)
+                    socketio.emit('peer_status_update', {
                     'status': 'success',
                     'data': peer_status,
                     'total_peers': len(peers),
                     'connected_peers': len([p for p in peer_status.values() if p['is_connected']]),
                     'timestamp': current_time.isoformat()
-                })
+                    })
+                    print(f"✅ Status update emitted successfully", flush=True)
+                except Exception as emit_error:
+                    print(f"❌ Emit error: {emit_error}", flush=True)
+                    import traceback
+                    print(f"Traceback: {traceback.format_exc()}", flush=True)
                 
         except Exception as e:
             print(f"❌ Error emitting status update: {e}")
