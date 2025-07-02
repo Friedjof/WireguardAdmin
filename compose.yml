@@ -1,0 +1,56 @@
+services:
+  vpn-manager:
+    build: .
+    container_name: vpn-manager
+    privileged: true  # Required for WireGuard and iptables
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    ports:
+      - "5000:5000"       # Web interface
+      - "51820:51820/udp" # WireGuard VPN port
+    volumes:
+      - ./instance:/app/instance                   # Database persistence
+      - ./logs:/app/logs                           # Application logs
+      - ./backups:/app/backups                     # Configuration backups
+      - vpn_wireguard_config:/etc/wireguard        # WireGuard system config
+    environment:
+      # WireGuard Configuration
+      - VPN_SERVER_IP=10.0.0.1      # VPN internal server IP (first IP in subnet)
+      - SERVER_PUBLIC_IP=172.24.0.2 # Replace with your server's public IP/domain
+      - LISTEN_PORT=51820
+      - VPN_SUBNET=10.0.0.0/24
+      
+      # Optional: Set your own keys (will be generated if not provided)
+      - SERVER_PRIVATE_KEY=8Cp9b08QVm61WQtWTM/7lQADjGIIy9wlgoysnf4kFH8=
+      - SERVER_PUBLIC_KEY=ngDV+vQNaJW5D+tKWBJox4j2MmB+IrooH/Q8i58QB0M=
+      
+      # Flask Configuration
+      - FLASK_ENV=production
+      - FLASK_DEBUG=false
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    entrypoint: ["/app/docker/entrypoint.sh"]
+    command: ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+    networks:
+      default:
+        ipv4_address: 172.24.0.2
+
+volumes:
+  vpn_wireguard_config:
+    driver: local
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.24.0.0/28

@@ -1,0 +1,514 @@
+{% extends "base.html" %}
+
+{% block title %}
+{% if peer %}
+Edit {{ peer.name }} - WireGuard Manager
+{% else %}
+Add New Peer - WireGuard Manager
+{% endif %}
+{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/console.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>
+        {% if peer %}
+        <i class="fas fa-edit me-2"></i>Edit Peer: {{ peer.name }}
+        {% else %}
+        <i class="fas fa-plus me-2"></i>Add New Peer
+        {% endif %}
+    </h1>
+    <div class="btn-group" role="group">
+        {% if peer %}
+        <a href="{{ url_for('show_peer', peer_id=peer.id) }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Details
+        </a>
+        {% endif %}
+        <a href="{{ url_for('list_peers') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-list me-1"></i>All Peers
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    {% if peer %}
+                    <i class="fas fa-user-edit me-2"></i>Update Peer Configuration
+                    {% else %}
+                    <i class="fas fa-user-plus me-2"></i>Peer Configuration
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <form action="{% if peer %}{{ url_for('update_peer', peer_id=peer.id) }}{% else %}{{ url_for('create_peer') }}{% endif %}" method="post" data-peer-id="{% if peer %}{{ peer.id }}{% endif %}">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">
+                            <i class="fas fa-tag me-1"></i>Peer Name <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="name" 
+                               name="name" 
+                               value="{% if peer %}{{ peer.name }}{% endif %}"
+                               required 
+                               placeholder="e.g., john-laptop, alice-phone"
+                               pattern="[a-zA-Z0-9_-]+"
+                               title="Only letters, numbers, hyphens and underscores allowed"
+                               maxlength="100"
+                               onblur="validateField(this)"
+                               oninput="clearValidationError(this)">
+                        <div class="form-text">A unique name to identify this peer (alphanumeric, -, _ only)</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="public_key" class="form-label">
+                            <i class="fas fa-key me-1"></i>Public Key <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group">
+                            <input type="text" 
+                                   class="form-control font-monospace" 
+                                   id="public_key" 
+                                   name="public_key" 
+                                   value="{% if peer %}{{ peer.public_key }}{% endif %}"
+                                   required 
+                                   placeholder="e.g., LSsHed2xa2wxNymEit4kiOpj3kuaDuf0q0VohjRkAXQ="
+                                   maxlength="44"
+                                   onblur="validateField(this)"
+                                   oninput="clearValidationError(this)">
+                            {% if peer %}
+                            <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard('{{ peer.public_key }}', this)" title="Copy current key">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                            {% else %}
+                            <button type="button" class="btn btn-outline-secondary" onclick="generateKeyPair()" title="Generate key pair">
+                                <i class="fas fa-magic"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                        <div class="form-text">The WireGuard public key for this peer</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="assigned_ip" class="form-label">
+                            <i class="fas fa-network-wired me-1"></i>Assigned IP Address
+                        </label>
+                        <div class="input-group">
+                            <input type="text" 
+                                   class="form-control font-monospace"
+                                   id="assigned_ip" 
+                                   value="{% if peer %}{{ peer.assigned_ip or 'Not assigned' }}{% else %}{{ next_available_ip if next_available_ip else 'Loading...' }}{% endif %}"
+                                   readonly>
+                            {% if not peer %}
+                            <button type="button" class="btn btn-outline-secondary" onclick="refreshIP()" title="Refresh IP">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                        <div class="form-text">This IP is automatically assigned to the peer (cannot be changed)</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="fas fa-plus-circle me-1"></i>Additional Allowed IPs <span class="text-muted">(Optional)</span>
+                        </label>
+                        <div id="allowed-ips-container">
+                            <!-- Dynamic IP input fields will be populated here -->
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm mt-2" onclick="addIpField()">
+                            <i class="fas fa-plus me-1"></i>Add IP Range
+                        </button>
+                        <div class="form-text mt-2">
+                            IP ranges this peer should be allowed to access (CIDR notation). 
+                            <br><strong>Note:</strong> IPs must be outside the VPN subnet and cannot overlap with other peers.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="endpoint" class="form-label">
+                            <i class="fas fa-globe me-1"></i>Endpoint <span class="text-muted">(Optional)</span>
+                        </label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="endpoint" 
+                               name="endpoint" 
+                               value="{% if peer %}{{ peer.endpoint or '' }}{% endif %}"
+                               placeholder="e.g., example.com:51820, 192.168.1.100:12000">
+                        <div class="form-text">The endpoint address and port where this peer can be reached</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="persistent_keepalive" class="form-label">
+                            <i class="fas fa-heartbeat me-1"></i>Persistent Keepalive <span class="text-muted">(Optional)</span>
+                        </label>
+                        <div class="input-group">
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="persistent_keepalive" 
+                                   name="persistent_keepalive" 
+                                   value="{% if peer %}{{ peer.persistent_keepalive or '' }}{% endif %}"
+                                   min="0" 
+                                   max="65535" 
+                                   placeholder="25">
+                            <span class="input-group-text">seconds</span>
+                        </div>
+                        <div class="form-text">Interval for keepalive packets (recommended: 25 seconds for NAT traversal)</div>
+                    </div>
+
+                    <!-- Firewall Rules Section -->
+                    <div class="mb-4">
+                        <div class="card border-primary">
+                            <div class="card-header bg-primary text-white">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-shield-alt me-2"></i>Firewall Rules
+                                    <small class="float-end">Optional Security Configuration</small>
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <!-- Template Selection -->
+                                <div class="mb-3">
+                                    <label for="firewall_template" class="form-label">
+                                        <i class="fas fa-template me-1"></i>Security Template
+                                    </label>
+                                    <select class="form-select" id="firewall_template" name="firewall_template" onchange="applyFirewallTemplate()">
+                                        {% if not peer %}
+                                        <option value="unrestricted" selected>🔓 Unrestricted Access (No Firewall)</option>
+                                        {% else %}
+                                        <option value="">Select a template...</option>
+                                        <option value="unrestricted">🔓 Unrestricted Access (No Firewall)</option>
+                                        {% endif %}
+                                        <option value="internet_only">🌐 Internet Only (No Peer Communication)</option>
+                                        <option value="restricted">🔒 Restricted Access (Custom Rules)</option>
+                                        <option value="admin">👑 Administrator (Full Access)</option>
+                                        <option value="guest">👥 Guest Access (Limited)</option>
+                                    </select>
+                                    <div class="form-text">Choose a predefined security template or create custom rules below</div>
+                                </div>
+
+                                <!-- Rules Container -->
+                                <div id="firewall-rules-container">
+                                    <!-- Dynamic firewall rules will be populated here -->
+                                </div>
+
+                                <!-- Add Rule Button -->
+                                <div class="mb-3">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="addFirewallRule()">
+                                        <i class="fas fa-plus me-1"></i>Add Custom Rule
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm ms-2" onclick="previewIptablesRules()">
+                                        <i class="fas fa-eye me-1"></i>Preview iptables
+                                    </button>
+                                </div>
+
+                                <!-- Rules Summary -->
+                                <div class="alert alert-info">
+                                    <h6><i class="fas fa-info-circle me-1"></i>Firewall Rules Summary</h6>
+                                    <div id="rules-summary">
+                                        <p class="mb-0 text-muted">No firewall rules configured - peer will have unrestricted access</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if peer %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-1"></i>
+                        <strong>Note:</strong> The preshared key cannot be changed and will remain as: 
+                        <code>{{ peer.preshared_key[:10] }}...</code>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        {% if peer %}
+                        <a href="{{ url_for('show_peer', peer_id=peer.id) }}" class="btn btn-outline-secondary me-md-2">
+                            <i class="fas fa-times me-1"></i>Cancel
+                        </a>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-save me-1"></i>Update Peer
+                        </button>
+                        {% else %}
+                        <a href="{{ url_for('list_peers') }}" class="btn btn-outline-secondary me-md-2">
+                            <i class="fas fa-times me-1"></i>Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>Create Peer
+                        </button>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        {% if peer %}
+        <!-- Edit Mode Sidebar -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Current Configuration</h5>
+            </div>
+            <div class="card-body">
+                <dl class="small">
+                    <dt>Peer ID:</dt>
+                    <dd>{{ peer.id }}</dd>
+                    
+                    <dt>Created:</dt>
+                    <dd>{{ peer.created_at.strftime('%Y-%m-%d %H:%M') }}</dd>
+                    
+                    <dt>Last Updated:</dt>
+                    <dd>{{ peer.updated_at.strftime('%Y-%m-%d %H:%M') }}</dd>
+                    
+                    <dt>Preshared Key:</dt>
+                    <dd>
+                        <div class="d-flex align-items-center">
+                            <code class="me-2">{{ peer.preshared_key[:20] }}...</code>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('{{ peer.preshared_key }}', this)" title="Copy preshared key">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <small class="text-muted">Auto-generated, cannot be changed</small>
+                    </dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-tools me-2"></i>Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="validateForm()">
+                        <i class="fas fa-check me-1"></i>Test Validation
+                    </button>
+                    <button type="button" class="btn btn-outline-info btn-sm" onclick="showQRCode()">
+                        <i class="fas fa-qrcode me-1"></i>Show QR Code
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <!-- Create Mode Sidebar -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Instructions</h5>
+            </div>
+            <div class="card-body">
+                <h6><i class="fas fa-terminal me-1"></i>Generating Keys</h6>
+                <p class="small">Run these commands to generate a WireGuard key pair:</p>
+                <div class="bg-dark text-light p-2 rounded mb-3">
+                    <code class="d-block mb-1">wg genkey | tee privatekey | wg pubkey > publickey</code>
+                    <code class="d-block">cat publickey</code>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary mb-3" onclick="copyToClipboard('wg genkey | tee privatekey | wg pubkey > publickey\\ncat publickey', this)">
+                    <i class="fas fa-copy me-1"></i>Copy Commands
+                </button>
+
+                <h6><i class="fas fa-lightbulb me-1"></i>Field Tips</h6>
+                <ul class="small">
+                    <li><strong>Name:</strong> Use descriptive names like "john-laptop" or "server-01"</li>
+                    <li><strong>Allowed IPs:</strong> Use /32 for single IPs, /24 for subnets</li>
+                    <li><strong>Endpoint:</strong> Only needed for peers that connect to this server</li>
+                    <li><strong>Keepalive:</strong> Use 25 seconds if behind NAT/firewall</li>
+                </ul>
+
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-1"></i>
+                    <strong>Note:</strong> A preshared key will be automatically generated for enhanced security.
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-tools me-2"></i>Key Generator</h5>
+            </div>
+            <div class="card-body">
+                <p class="small">Generate a new WireGuard key pair:</p>
+                <button type="button" class="btn btn-outline-success btn-sm w-100" onclick="generateKeyPair()">
+                    <i class="fas fa-magic me-1"></i>Generate Key Pair
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm w-100 mt-2" disabled title="QR code will be available after creating the peer">
+                    <i class="fas fa-qrcode me-1"></i>QR Code (Available after creation)
+                </button>
+                <div id="generatedKeys" class="mt-3 d-none">
+                    <div class="form-group mb-2">
+                        <label class="form-label small">Private Key:</label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control font-monospace" id="generatedPrivateKey" readonly>
+                            <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard(document.getElementById('generatedPrivateKey').value, this)">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label small">Public Key:</label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control font-monospace" id="generatedPublicKey" readonly>
+                            <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard(document.getElementById('generatedPublicKey').value, this); document.getElementById('public_key').value = document.getElementById('generatedPublicKey').value;">
+                                <i class="fas fa-copy"></i> Use
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- iptables Rules Modal -->
+<div class="modal fade" id="iptablesModal" tabindex="-1" aria-labelledby="iptablesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="iptablesModalLabel">
+                    <i class="fas fa-terminal me-2 text-success"></i>
+                    {% if peer %}Generated iptables Rules for {{ peer.name }}{% else %}Preview iptables Rules{% endif %}
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <!-- Terminal Header -->
+                <div class="bg-secondary p-2 d-flex justify-content-between align-items-center border-bottom border-dark">
+                    <div class="d-flex align-items-center">
+                        <span class="text-success me-2">●</span>
+                        <span class="text-warning me-2">●</span>
+                        <span class="text-danger me-2">●</span>
+                        <small class="text-muted ms-3">iptables-rules.sh</small>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-light btn-sm" onclick="copyAllIptablesRules()" title="Copy all rules">
+                            <i class="fas fa-copy me-1"></i>Copy All
+                        </button>
+                        <button class="btn btn-outline-success btn-sm" onclick="downloadIptablesRules()" title="Download as script">
+                            <i class="fas fa-download me-1"></i>Download
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Terminal Content -->
+                <div class="console-container">
+                    <div id="iptablesContent" class="console-content">
+                        <div class="d-flex justify-content-center align-items-center" style="height: 400px;">
+                            <div class="text-muted">
+                                <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                                <p>Loading iptables rules...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary bg-dark">
+                <div class="flex-grow-1">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Click on any line to copy that specific rule
+                    </small>
+                </div>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if peer %}
+<!-- QR Code Modal -->
+<div class="modal fade" id="qrCodeModal" tabindex="-1" aria-labelledby="qrCodeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="qrCodeModalLabel">
+                    <i class="fas fa-qrcode me-2"></i>QR Code for {{ peer.name }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div id="qrCodeContainer">
+                    <div class="d-flex justify-content-center align-items-center" style="height: 300px;">
+                        <div class="text-muted">
+                            <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                            <p>Loading...</p>
+                        </div>
+                    </div>
+                </div>
+                <p class="mt-3 small text-muted">
+                    Scan this QR code with the WireGuard mobile app to quickly import the configuration.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="downloadQRCode()" disabled>
+                    <i class="fas fa-download me-1"></i>Download QR Code
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+<script src="{{ url_for('static', filename='js/console.js') }}"></script>
+<script src="{{ url_for('static', filename='js/firewall.js') }}"></script>
+<script src="{{ url_for('static', filename='js/peer-form.js') }}"></script>
+{% if peer %}
+<script src="{{ url_for('static', filename='js/qr-code.js') }}"></script>
+{% endif %}
+
+<script>
+// Initialize form based on mode
+document.addEventListener('DOMContentLoaded', function() {
+    {% if peer %}
+    // Edit mode - load existing allowed IPs
+    const existingIPs = [
+        {% for allowed_ip in peer.allowed_ip_ranges %}
+        { network: '{{ allowed_ip.ip_network }}', description: '{{ allowed_ip.description or "" }}' }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    
+    if (existingIPs.length === 0) {
+        addIpField();
+    } else {
+        existingIPs.forEach(ip => {
+            addIpField(ip.network, ip.description);
+        });
+    }
+
+    // Load existing firewall rules
+    const existingRules = [
+        {% for rule in peer.firewall_rules %}
+        {
+            name: '{{ rule.name }}',
+            type: '{{ rule.rule_type }}',
+            action: '{{ rule.action }}',
+            destination: '{{ rule.destination or "" }}',
+            protocol: '{{ rule.protocol }}',
+            port: '{{ rule.port_range }}'
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    
+    if (existingRules.length === 0) {
+        document.getElementById('firewall_template').value = 'unrestricted';
+    } else {
+        existingRules.forEach(rule => {
+            addFirewallRule(rule);
+        });
+    }
+    {% else %}
+    // Create mode - add one empty IP field
+    addIpField();
+    {% endif %}
+    
+    updateRulesSummary();
+});
+</script>
+{% endblock %}
