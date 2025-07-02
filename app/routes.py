@@ -1010,6 +1010,23 @@ def api_wireguard_status():
             'message': f'Error getting WireGuard status: {str(e)}'
         }), 500
 
+@app.route('/api/v1/wireguard/force-update', methods=['POST'])
+def api_force_wireguard_update():
+    """Force an immediate WebSocket status update"""
+    try:
+        from app.websocket_manager import ws_manager
+        ws_manager.force_status_update()
+        return jsonify({
+            'status': 'success',
+            'message': 'Status update triggered',
+            'connected_clients': len(ws_manager.connected_clients)
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error triggering update: {str(e)}'
+        }), 500
+
 @app.route('/api/v1/peers/<int:peer_id>/status', methods=['GET'])
 def api_peer_live_status(peer_id):
     """Get live status for a specific peer"""
@@ -1038,4 +1055,31 @@ def api_peer_live_status(peer_id):
         return jsonify({
             'status': 'error',
             'message': f'Error getting peer status: {str(e)}'
+        }), 500
+
+
+@app.route('/api/v1/wireguard/refresh-status', methods=['POST'])
+def refresh_wireguard_status():
+    """
+    Trigger immediate WireGuard status refresh and WebSocket updates
+    Called by frontend every 10 seconds to ensure fresh data
+    """
+    try:
+        from app.websocket_manager import ws_manager
+        
+        # Force status update and emit to all connected WebSocket clients
+        print(f"🔄 Frontend triggered status refresh")
+        ws_manager.force_status_update()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Status refresh triggered',
+            'connected_clients': len(ws_manager.connected_clients)
+        })
+        
+    except Exception as e:
+        print(f"❌ Error in refresh-status endpoint: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Error refreshing status: {str(e)}'
         }), 500

@@ -22,6 +22,7 @@ class WebSocketManager:
         self.update_thread = None
         self.connected_clients = set()
         self.peer_traffic_history = {}  # Store last 20 data points per peer
+        self.last_peer_status = {}  # Store last status for change detection
         
     def start(self):
         """Start the WebSocket manager and background status updates"""
@@ -51,12 +52,12 @@ class WebSocketManager:
             try:
                 if self.connected_clients:
                     self._emit_status_update()
-                eventlet.sleep(2)  # Update every 2 seconds using eventlet
+                eventlet.sleep(0.5)  # Update every 500ms for real-time responsiveness
             except Exception as e:
                 print(f"❌ Error in status update loop: {e}")
                 eventlet.sleep(5)  # Wait longer on error
                 
-    def _emit_status_update(self):
+    def _emit_status_update(self, force_update=False):
         """Emit status update to all connected clients"""
         try:
             # Get WireGuard status
@@ -142,29 +143,93 @@ class WebSocketManager:
                         }
                     }
                 
-                # Emit to all connected clients
-                try:
-                    print(f"🔧 About to emit peer_status_update...", flush=True)
-                    socketio.emit('peer_status_update', {
-                    'status': 'success',
-                    'data': peer_status,
-                    'total_peers': len(peers),
-                    'connected_peers': len([p for p in peer_status.values() if p['is_connected']]),
-                    'timestamp': current_time.isoformat()
-                    })
-                    print(f"✅ Status update emitted successfully", flush=True)
-                except Exception as emit_error:
-                    print(f"❌ Emit error: {emit_error}", flush=True)
-                    import traceback
-                    print(f"Traceback: {traceback.format_exc()}", flush=True)
+                # Check if status has actually changed before emitting
+                status_changed = self._has_status_changed(peer_status)
+                
+                if force_update or status_changed or not self.last_peer_status:
+                    # Emit to all connected clients
+                    try:
+                        update_reason = "forced" if force_update else ("no_previous_data" if not self.last_peer_status else "status_changed")
+                        print(f"🔧 Emitting update (reason: {update_reason})...", flush=True)
+                        socketio.emit('peer_status_update', {
+                        'status': 'success',
+                        'data': peer_status,
+                        'total_peers': len(peers),
+                        'connected_peers': len([p for p in peer_status.values() if p['is_connected']]),
+                        'timestamp': current_time.isoformat()
+                        })
+                        print(f"✅ Status update emitted successfully", flush=True)
+                        
+                        # Update last status for next comparison
+                        self.last_peer_status = self._create_status_snapshot(peer_status)
+                        
+                    except Exception as emit_error:
+                        print(f"❌ Emit error: {emit_error}", flush=True)
+                        import traceback
+                        print(f"Traceback: {traceback.format_exc()}", flush=True)
+                else:
+                    print(f"🔇 No status changes detected, skipping update", flush=True)
                 
         except Exception as e:
             print(f"❌ Error emitting status update: {e}")
+    
+    def _has_status_changed(self, current_status):
+        """Check if peer status has changed since last update"""
+        if not self.last_peer_status:
+            return True
+            
+        # Check for peer count changes
+        if len(current_status) != len(self.last_peer_status):
+            print(f"📊 Peer count changed: {len(self.last_peer_status)} → {len(current_status)}")
+            return True
+            
+        # Check each peer for status changes
+        for peer_id, current_peer in current_status.items():
+            last_peer = self.last_peer_status.get(peer_id, {})
+            
+            # Check critical status fields
+            critical_fields = ['is_connected', 'endpoint', 'client_ip']
+            for field in critical_fields:
+                if current_peer.get(field) != last_peer.get(field):
+                    print(f"📊 Peer {peer_id} field '{field}' changed: {last_peer.get(field)} → {current_peer.get(field)}")
+                    return True
+                    
+            # Check for significant traffic changes (more than 1KB)
+            current_rx = current_peer.get('transfer_rx', 0)
+            current_tx = current_peer.get('transfer_tx', 0)
+            last_rx = last_peer.get('transfer_rx', 0)
+            last_tx = last_peer.get('transfer_tx', 0)
+            
+            if abs(current_rx - last_rx) > 1024 or abs(current_tx - last_tx) > 1024:
+                print(f"📊 Peer {peer_id} significant traffic change")
+                return True
+                
+        return False
+    
+    def _create_status_snapshot(self, peer_status):
+        """Create a lightweight snapshot for change detection"""
+        snapshot = {}
+        for peer_id, peer_data in peer_status.items():
+            snapshot[peer_id] = {
+                'is_connected': peer_data.get('is_connected'),
+                'endpoint': peer_data.get('endpoint'),
+                'client_ip': peer_data.get('client_ip'),
+                'transfer_rx': peer_data.get('transfer_rx', 0),
+                'transfer_tx': peer_data.get('transfer_tx', 0)
+            }
+        return snapshot
             
     def add_client(self, session_id):
         """Add a connected client"""
         self.connected_clients.add(session_id)
         print(f"🔌 Client connected: {session_id} (Total: {len(self.connected_clients)})")
+        
+        # Send immediate status update to new client (force update, bypass change detection)
+        try:
+            print(f"📤 Sending immediate status update to new client")
+            self._emit_status_update(force_update=True)
+        except Exception as e:
+            print(f"❌ Error sending immediate update: {e}")
         
     def remove_client(self, session_id):
         """Remove a disconnected client"""
@@ -214,6 +279,14 @@ class WebSocketManager:
                 'message': error_msg
             })
             return {'status': 'error', 'message': error_msg}
+    
+    def force_status_update(self):
+        """Force an immediate status update (useful for manual triggers)"""
+        print(f"🔄 Forcing immediate status update...")
+        if self.connected_clients:
+            self._emit_status_update(force_update=True)
+        else:
+            print(f"⚠️ No connected clients to send update to")
 
 
 # Global WebSocket manager instance

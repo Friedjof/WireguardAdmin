@@ -8,7 +8,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
-<body>
+<body data-refresh-interval="{{ config.get('WS_REFRESH_INTERVAL_MS', 5000) }}">
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('list_peers') }}">
@@ -98,6 +98,10 @@
             });
         }
     </script>
+    
+    <!-- Status Refresh System - ensures fresh WebSocket data -->
+    <script src="{{ url_for('static', filename='js/status-refresh.js') }}"></script>
+    
     {% block scripts %}{% endblock %}
 </body>
 </html>
