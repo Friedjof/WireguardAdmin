@@ -91,26 +91,48 @@ class LiveStatusManager {
             }
         }
 
-        // Update connection text
+        // Update connection text - simplified for peer list
         const text = document.getElementById(`connection-text-${peerId}`);
         if (text) {
             if (peer.is_active && peer.is_connected) {
-                text.innerHTML = `
-                    <span class="text-success fw-bold">Connected</span>
-                    ${peer.endpoint ? `<br><small class="text-muted">${peer.endpoint}</small>` : ''}
-                `;
+                text.innerHTML = '<span class="text-success fw-bold">Connected</span>';
             } else if (peer.is_active) {
-                text.innerHTML = `
-                    <span class="text-danger">Disconnected</span>
-                    <br><small class="text-muted">${peer.latest_handshake}</small>
-                `;
+                text.innerHTML = '<span class="text-danger">Disconnected</span>';
             } else {
                 text.innerHTML = '<span class="text-muted">Inactive</span>';
             }
         }
 
+        // Update detailed connection info for peer detail page if present
+        const detailedText = document.getElementById(`connection-text-detailed-${peerId}`);
+        if (detailedText) {
+            if (peer.is_active && peer.is_connected) {
+                detailedText.innerHTML = `
+                    <div class="connection-status-detail">
+                        <span class="text-success fw-bold">Connected</span>
+                        ${peer.client_ip ? `<br><small class="text-info">From: ${peer.client_ip}</small>` : ''}
+                        ${peer.connection_duration ? `<br><small class="text-muted">Duration: ${peer.connection_duration}</small>` : ''}
+                        ${peer.latest_handshake ? `<br><small class="text-muted">Last: ${peer.latest_handshake}</small>` : ''}
+                    </div>
+                `;
+            } else if (peer.is_active) {
+                detailedText.innerHTML = `
+                    <div class="connection-status-detail">
+                        <span class="text-danger">Disconnected</span>
+                        ${peer.latest_handshake ? `<br><small class="text-muted">Last: ${peer.latest_handshake}</small>` : ''}
+                        ${peer.client_ip ? `<br><small class="text-muted">Last IP: ${peer.client_ip}</small>` : ''}
+                    </div>
+                `;
+            } else {
+                detailedText.innerHTML = '<span class="text-muted">Inactive</span>';
+            }
+        }
+
         // Update transfer data if elements exist
         this.updateTransferData(peerId, peer);
+        
+        // Update client info section
+        this.updateClientInfo(peerId, peer);
     }
 
     updateTransferData(peerId, peer) {
@@ -181,6 +203,31 @@ class LiveStatusManager {
         }
         
         return formatted;
+    }
+
+    updateClientInfo(peerId, peer) {
+        const clientInfoElement = document.getElementById(`client-info-${peerId}`);
+        if (clientInfoElement) {
+            if (peer.is_active && peer.is_connected) {
+                clientInfoElement.innerHTML = `
+                    <div class="client-info-detail">
+                        ${peer.client_ip ? `<div class="client-ip"><i class="fas fa-globe me-1"></i>${peer.client_ip}</div>` : ''}
+                        ${peer.connection_duration ? `<small class="text-muted">Connected: ${peer.connection_duration}</small>` : ''}
+                        ${peer.endpoint ? `<br><small class="text-muted">Endpoint: ${peer.endpoint}</small>` : ''}
+                    </div>
+                `;
+            } else if (peer.is_active) {
+                clientInfoElement.innerHTML = `
+                    <div class="client-info-detail">
+                        <span class="text-muted">Disconnected</span>
+                        ${peer.client_ip ? `<br><small class="text-muted">Last IP: ${peer.client_ip}</small>` : ''}
+                        ${peer.latest_handshake ? `<br><small class="text-muted">${peer.latest_handshake}</small>` : ''}
+                    </div>
+                `;
+            } else {
+                clientInfoElement.innerHTML = '<small class="text-muted fst-italic">Inactive</small>';
+            }
+        }
     }
 
     updateSummary(totalPeers, connectedPeers) {

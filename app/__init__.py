@@ -17,3 +17,12 @@ with app.app_context():
 
 # Import routes to register them with the app
 from app import routes
+
+# Generate initial wg0.conf file on startup
+with app.app_context():
+    try:
+        from app.utils import generate_wg0_conf
+        generate_wg0_conf()
+        print("✓ Initial wg0.conf generated successfully")
+    except Exception as e:
+        print(f"⚠️  Warning: Could not generate initial wg0.conf: {e}")

@@ -210,7 +210,8 @@
 .connection-text {
     font-size: 0.75rem;
     font-weight: 500;
-    min-width: 80px;
+    min-width: 120px;
+    max-width: 200px;
 }
 
 .connection-text .text-success {
@@ -223,6 +224,52 @@
 
 .connection-text .text-muted {
     color: #6c757d !important;
+}
+
+.connection-text .text-info {
+    color: #17a2b8 !important;
+}
+
+/* Enhanced connection status detail styling */
+.connection-status-detail {
+    line-height: 1.3;
+}
+
+.connection-status-detail small {
+    font-size: 0.65rem;
+    display: block;
+    margin-top: 1px;
+}
+
+.connection-status-detail .text-info {
+    font-weight: 600;
+}
+
+/* Better spacing for multiple lines */
+.connection-status-detail br + small {
+    margin-top: 2px;
+}
+
+/* Client info styling */
+.client-info-detail {
+    font-size: 0.75rem;
+    line-height: 1.3;
+}
+
+.client-info-detail .client-ip {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 2px;
+}
+
+.client-info-detail .client-ip i {
+    color: #17a2b8;
+}
+
+.client-info-detail small {
+    font-size: 0.65rem;
+    display: block;
+    margin-top: 1px;
 }
 
 /* Transfer data styling */

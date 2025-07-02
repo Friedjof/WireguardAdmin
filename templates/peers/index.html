@@ -21,12 +21,10 @@
                 <table class="table table-hover">
                     <thead>
                         <tr>
-                            <th>Connection</th>
+                            <th style="width: 200px;">Status</th>
                             <th>Name</th>
                             <th>Public Key</th>
                             <th>Assigned IP</th>
-                            <th>Endpoint</th>
-                            <th>Transfer</th>
                             <th>Created</th>
                             <th>Actions</th>
                         </tr>
@@ -57,7 +55,7 @@
                                             <div class="dot-inner"></div>
                                         </div>
                                         <small class="connection-text ms-2" id="connection-text-{{ peer.id }}">
-                                            <span class="text-muted">Checking...</span>
+                                            <span class="text-muted">•••</span>
                                         </small>
                                     </div>
                                 </div>
@@ -79,21 +77,6 @@
                                     <button class="btn btn-sm btn-outline-secondary" onclick="copyToClipboard('{{ peer.assigned_ip }}', this)" title="Copy IP range">
                                         <i class="fas fa-copy"></i>
                                     </button>
-                                </div>
-                            </td>
-                            <td>
-                                {% if peer.endpoint %}
-                                    <span class="text-muted">{{ peer.endpoint }}</span>
-                                {% else %}
-                                    <span class="text-muted fst-italic">Not set</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div id="transfer-{{ peer.id }}">
-                                    <div class="transfer-info">
-                                        <div class="transfer-rx">↓ --</div>
-                                        <div class="transfer-tx">↑ --</div>
-                                    </div>
                                 </div>
                             </td>
                             <td>
@@ -133,9 +116,7 @@
                             <strong>Total Peers:</strong> {{ peers|length }}<br>
                             <strong>Active Configs:</strong> {{ peers|selectattr('endpoint')|list|length }}<br>
                             <strong>Server Config:</strong> 
-                            <a href="/wg0.conf" target="_blank" class="text-decoration-none">
-                                <i class="fas fa-external-link-alt"></i> View wg0.conf
-                            </a>
+                            <span class="text-muted">wg0.conf generated automatically</span>
                         </p>
                     </div>
                 </div>
@@ -175,52 +156,79 @@
 
 <!-- Firewall Management Modal -->
 <div class="modal fade" id="firewallModal" tabindex="-1" aria-labelledby="firewallModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header border-secondary">
                 <h5 class="modal-title" id="firewallModalLabel">
-                    <i class="fas fa-shield-alt me-2"></i>Firewall Management
+                    <i class="fas fa-terminal me-2 text-success"></i>Firewall Management
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <div id="firewallStatus" class="mb-3">
-                    <div class="d-flex justify-content-center">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
+            <div class="modal-body p-0">
+                <!-- Terminal Header -->
+                <div class="bg-secondary p-2 d-flex justify-content-between align-items-center border-bottom border-dark">
+                    <div class="d-flex align-items-center">
+                        <span class="text-success me-2">●</span>
+                        <span class="text-warning me-2">●</span>
+                        <span class="text-danger me-2">●</span>
+                        <small class="text-muted ms-3">firewall-management.sh</small>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-light btn-sm" onclick="copyAllFirewallRules()" title="Copy all rules">
+                            <i class="fas fa-copy me-1"></i>Copy All
+                        </button>
+                        <button class="btn btn-outline-success btn-sm" onclick="downloadFirewallRules()" title="Download as script">
+                            <i class="fas fa-download me-1"></i>Download
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="bg-dark p-3 border-bottom border-secondary">
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button class="btn btn-info btn-sm" onclick="previewAllRules()">
+                                    <i class="fas fa-eye me-1"></i>Preview All Rules
+                                </button>
+                                <button class="btn btn-warning btn-sm" onclick="applyAllRules(true)">
+                                    <i class="fas fa-play me-1"></i>Test Apply All
+                                </button>
+                                <button class="btn btn-success btn-sm" onclick="applyAllRules(false)">
+                                    <i class="fas fa-check me-1"></i>Apply All Rules
+                                </button>
+                                <button class="btn btn-secondary btn-sm" onclick="backupRules()">
+                                    <i class="fas fa-save me-1"></i>Backup Current Rules
+                                </button>
+                                <button class="btn btn-outline-light btn-sm" onclick="showCurrentRules()">
+                                    <i class="fas fa-list me-1"></i>Show Current Rules
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
                 
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6><i class="fas fa-cogs me-1"></i>Actions</h6>
-                        <div class="d-grid gap-2">
-                            <button class="btn btn-info btn-sm" onclick="previewAllRules()">
-                                <i class="fas fa-eye me-1"></i>Preview All Rules
-                            </button>
-                            <button class="btn btn-warning btn-sm" onclick="applyAllRules(true)">
-                                <i class="fas fa-play me-1"></i>Test Apply All
-                            </button>
-                            <button class="btn btn-success btn-sm" onclick="applyAllRules(false)">
-                                <i class="fas fa-check me-1"></i>Apply All Rules
-                            </button>
-                            <button class="btn btn-secondary btn-sm" onclick="backupRules()">
-                                <i class="fas fa-save me-1"></i>Backup Current Rules
-                            </button>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <h6><i class="fas fa-list me-1"></i>Current iptables Rules</h6>
-                        <div id="currentRules" class="border p-2 bg-light" style="height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.8em;">
-                            Loading current rules...
+                <!-- Terminal Content -->
+                <div class="console-container">
+                    <div id="firewallContent" class="console-content" style="min-height: 500px;">
+                        <div class="d-flex justify-content-center align-items-center" style="height: 400px;">
+                            <div class="text-muted">
+                                <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                                <p>Loading firewall management...</p>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer border-secondary bg-dark">
+                <div class="flex-grow-1">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Click on any line to copy that specific rule
+                    </small>
+                </div>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="refreshFirewallStatus()">
+                <button type="button" class="btn btn-primary" onclick="refreshFirewallManagement()">
                     <i class="fas fa-sync me-1"></i>Refresh
                 </button>
             </div>
@@ -230,17 +238,34 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/live-status.js') }}"></script>
+<!-- Socket.IO Client -->
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<script src="{{ url_for('static', filename='js/websocket-manager.js') }}"></script>
 <script>
-async function togglePeerStatus(toggleElement) {
-    const peerId = toggleElement.dataset.peerId;
+function togglePeerStatus(toggleElement) {
+    const peerId = parseInt(toggleElement.dataset.peerId);
     const peerName = toggleElement.dataset.peerName;
     const isActive = toggleElement.checked;
     const action = isActive ? 'activate' : 'deactivate';
-    const endpoint = isActive ? 'activate' : 'deactivate';
     
     // Disable the toggle during the request
     toggleElement.disabled = true;
+    
+    // Use WebSocket if available, fallback to HTTP
+    if (window.wsManager && window.wsManager.isConnected) {
+        if (isActive) {
+            window.wsManager.activatePeer(peerId);
+        } else {
+            window.wsManager.deactivatePeer(peerId);
+        }
+    } else {
+        // Fallback to HTTP API
+        togglePeerStatusHTTP(toggleElement, peerId, peerName, isActive, action);
+    }
+}
+
+async function togglePeerStatusHTTP(toggleElement, peerId, peerName, isActive, action) {
+    const endpoint = isActive ? 'activate' : 'deactivate';
     
     try {
         const response = await fetch(`/api/v1/peers/${peerId}/${endpoint}`, {
@@ -250,23 +275,13 @@ async function togglePeerStatus(toggleElement) {
             }
         });
         
-        // Check if response is ok and has content
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
-        const responseText = await response.text();
-        let data;
-        
-        try {
-            data = JSON.parse(responseText);
-        } catch (parseError) {
-            // If JSON parsing fails, show the raw response
-            throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}`);
-        }
+        const data = await response.json();
         
         if (data.status === 'success') {
-            // Update the label text and color
             const label = document.querySelector(`label[for="peer-toggle-${peerId}"] span`);
             if (isActive) {
                 label.textContent = 'Active';
@@ -276,19 +291,15 @@ async function togglePeerStatus(toggleElement) {
                 label.className = 'text-warning fw-bold';
             }
             
-            // Show success message
             showToast(`Peer "${peerName}" ${action}d successfully!`, 'success');
         } else {
-            // Revert the toggle on error
             toggleElement.checked = !isActive;
             showToast(`Error ${action}ing peer: ${data.message || 'Unknown error'}`, 'danger');
         }
     } catch (error) {
-        // Revert the toggle on error
         toggleElement.checked = !isActive;
         showToast(`Error ${action}ing peer: ${error.message}`, 'danger');
     } finally {
-        // Re-enable the toggle
         toggleElement.disabled = false;
     }
 }
@@ -318,79 +329,139 @@ async function showFirewallManagement() {
     const modal = new bootstrap.Modal(document.getElementById('firewallModal'));
     modal.show();
     
-    await refreshFirewallStatus();
+    displayFirewallWelcome();
 }
 
-async function refreshFirewallStatus() {
-    try {
-        document.getElementById('firewallStatus').innerHTML = `
-            <div class="d-flex justify-content-center">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-            </div>
-        `;
-        
-        const response = await fetch('/api/v1/firewall/status');
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-            const accessStatus = data.iptables_access.status === 'success' ? 
-                '<span class="badge bg-success">✓ iptables Access OK</span>' : 
-                '<span class="badge bg-danger">✗ No iptables Access</span>';
-            
-            document.getElementById('firewallStatus').innerHTML = `
-                <div class="alert alert-info">
-                    ${accessStatus}
-                    <p class="mb-0 mt-2">${data.iptables_access.message}</p>
-                </div>
-            `;
-            
-            // Update current rules
-            if (data.current_rules.status === 'success') {
-                document.getElementById('currentRules').textContent = data.current_rules.rules;
-            } else {
-                document.getElementById('currentRules').textContent = 'Error loading rules: ' + data.current_rules.message;
-            }
+// Global variables for firewall management
+window.currentFirewallRules = null;
+
+function displayFirewallWelcome() {
+    const content = document.getElementById('firewallContent');
+    
+    let html = '<div class="terminal-prompt">root@wireguard-server:~# </div>';
+    html += '<span class="terminal-path">./firewall-management.sh</span><br><br>';
+    html += '<div class="text-success">🛡️  WireGuard Firewall Management System</div><br>';
+    html += '<div class="text-muted">Select an action from the buttons above to manage iptables rules:</div><br>';
+    html += '<div class="text-info">• Preview All Rules - Generate and preview iptables rules</div>';
+    html += '<div class="text-info">• Test Apply All - Dry run to test rule application</div>';
+    html += '<div class="text-info">• Apply All Rules - Apply rules to the system</div>';
+    html += '<div class="text-info">• Backup Current Rules - Create a backup of current rules</div>';
+    html += '<div class="text-info">• Show Current Rules - Display currently active rules</div><br>';
+    html += '<div class="terminal-prompt">root@wireguard-server:~# </div>';
+    html += '<span class="text-warning">awaiting command...</span>';
+    
+    content.innerHTML = html;
+}
+
+function displayFirewallLoading(message) {
+    const content = document.getElementById('firewallContent');
+    
+    let html = '<div class="terminal-prompt">root@wireguard-server:~# </div>';
+    html += '<span class="terminal-path">./firewall-management.sh</span><br><br>';
+    html += `<div class="text-warning"><i class="fas fa-spinner fa-spin me-2"></i>${message}</div><br>`;
+    html += '<div class="terminal-prompt">root@wireguard-server:~# </div>';
+    html += '<span class="text-muted">processing...</span>';
+    
+    content.innerHTML = html;
+}
+
+function displayFirewallError(message) {
+    const content = document.getElementById('firewallContent');
+    
+    let html = '<div class="terminal-prompt">root@wireguard-server:~# </div>';
+    html += '<span class="terminal-path">./firewall-management.sh</span><br><br>';
+    html += `<div class="text-danger">❌ ERROR: ${message}</div><br>`;
+    html += '<div class="terminal-prompt">root@wireguard-server:~# </div>';
+    html += '<span class="text-danger">command failed</span>';
+    
+    content.innerHTML = html;
+}
+
+function displayFirewallSuccess(message) {
+    const content = document.getElementById('firewallContent');
+    
+    let html = '<div class="terminal-prompt">root@wireguard-server:~# </div>';
+    html += '<span class="terminal-path">./firewall-management.sh</span><br><br>';
+    html += `<div class="text-success">✅ SUCCESS: ${message}</div><br>`;
+    html += '<div class="terminal-prompt">root@wireguard-server:~# </div>';
+    html += '<span class="text-success">command completed</span>';
+    
+    content.innerHTML = html;
+}
+
+function displayFirewallContent(rules, title) {
+    const content = document.getElementById('firewallContent');
+    window.currentFirewallRules = rules;
+    
+    let html = '<div class="terminal-prompt">root@wireguard-server:~# </div>';
+    html += '<span class="terminal-path">./firewall-management.sh</span><br><br>';
+    html += `<div class="text-success"># ${title}</div><br>`;
+    
+    rules.forEach((rule, index) => {
+        if (rule.startsWith('#')) {
+            html += `<div class="console-line comment" onclick="copyFirewallLine(this, ${index})">${rule}</div>`;
+        } else if (rule.trim() === '') {
+            html += '<br>';
         } else {
-            document.getElementById('firewallStatus').innerHTML = `
-                <div class="alert alert-danger">Error loading firewall status</div>
-            `;
+            html += `<div class="console-line rule-command" onclick="copyFirewallLine(this, ${index})">${rule}</div>`;
         }
-    } catch (error) {
-        document.getElementById('firewallStatus').innerHTML = `
-            <div class="alert alert-danger">Error: ${error.message}</div>
-        `;
+    });
+    
+    html += '<br><div class="terminal-prompt">root@wireguard-server:~# </div>';
+    html += '<span class="text-success">✓ command completed successfully</span>';
+    
+    content.innerHTML = html;
+}
+
+function copyFirewallLine(element, index) {
+    const rule = window.currentFirewallRules[index];
+    if (rule && rule.trim() !== '' && !rule.startsWith('#')) {
+        copyToClipboard(rule, element);
+        
+        // Visual feedback
+        element.classList.add('copied');
+        setTimeout(() => {
+            element.classList.remove('copied');
+        }, 500);
+        
+        // Show toast notification
+        showToast(`Copied: ${rule.substring(0, 50)}${rule.length > 50 ? '...' : ''}`, 'success');
     }
+}
+
+async function refreshFirewallManagement() {
+    await showCurrentRules();
 }
 
 async function previewAllRules() {
     try {
+        displayFirewallLoading('Generating iptables rules...');
+        
         const response = await fetch('/api/v1/firewall/rules/generate');
         const data = await response.json();
         
         if (data.status === 'success') {
-            const rulesText = data.rules.join('\\n');
-            alert('Generated iptables rules for all peers:\\n\\n' + rulesText);
+            displayFirewallContent(data.rules, 'Generated iptables rules for all peers');
+            showToast(`Generated ${data.rules.length} iptables rules`, 'success');
         } else {
-            alert('Error generating rules: ' + data.message);
+            displayFirewallError('Error generating rules: ' + data.message);
+            showToast('Error generating rules: ' + data.message, 'danger');
         }
     } catch (error) {
-        alert('Error previewing rules: ' + error.message);
+        displayFirewallError('Error previewing rules: ' + error.message);
+        showToast('Error previewing rules: ' + error.message, 'danger');
     }
 }
 
 async function applyAllRules(dryRun = false) {
     const action = dryRun ? 'test' : 'apply';
-    const confirmed = confirm(`Are you sure you want to ${action} firewall rules for ALL peers? This will modify system iptables.`);
+    const confirmation = await showConfirmationToast(`${action.charAt(0).toUpperCase() + action.slice(1)} firewall rules for ALL peers?`, 
+        'This will modify system iptables.');
     
-    if (!confirmed) return;
+    if (!confirmation) return;
     
     try {
-        const button = event.target;
-        const originalText = button.innerHTML;
-        button.disabled = true;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processing...';
+        displayFirewallLoading(`${action === 'test' ? 'Testing' : 'Applying'} firewall rules...`);
         
         const response = await fetch('/api/v1/firewall/rules/apply', {
             method: 'POST',
@@ -406,29 +477,26 @@ async function applyAllRules(dryRun = false) {
         
         if (data.status === 'success') {
             if (dryRun) {
-                alert('Dry run completed successfully:\\n\\n' + (data.rules ? data.rules.join('\\n') : data.message));
+                const rules = data.rules ? data.rules : [data.message];
+                displayFirewallContent(rules, 'Dry run completed successfully');
+                showToast('Dry run completed successfully', 'success');
             } else {
-                alert('Firewall rules applied successfully!\\n\\n' + data.message);
-                await refreshFirewallStatus(); // Refresh the current rules display
+                displayFirewallSuccess(data.message);
+                showToast('Firewall rules applied successfully!', 'success');
             }
         } else {
-            alert('Error: ' + data.message);
+            displayFirewallError('Error: ' + data.message);
+            showToast('Error: ' + data.message, 'danger');
         }
     } catch (error) {
-        alert('Error applying rules: ' + error.message);
-    } finally {
-        const button = event.target;
-        button.disabled = false;
-        button.innerHTML = originalText;
+        displayFirewallError('Error applying rules: ' + error.message);
+        showToast('Error applying rules: ' + error.message, 'danger');
     }
 }
 
 async function backupRules() {
     try {
-        const button = event.target;
-        const originalText = button.innerHTML;
-        button.disabled = true;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Creating backup...';
+        displayFirewallLoading('Creating backup...');
         
         const response = await fetch('/api/v1/firewall/backup', {
             method: 'POST'
@@ -437,17 +505,131 @@ async function backupRules() {
         const data = await response.json();
         
         if (data.status === 'success') {
-            alert('Backup created successfully!\\n\\nFile: ' + data.backup_file);
+            displayFirewallSuccess('Backup created successfully!\\n\\nFile: ' + data.backup_file);
+            showToast('Backup created successfully!', 'success');
         } else {
-            alert('Error creating backup: ' + data.message);
+            displayFirewallError('Error creating backup: ' + data.message);
+            showToast('Error creating backup: ' + data.message, 'danger');
         }
     } catch (error) {
-        alert('Error creating backup: ' + error.message);
-    } finally {
-        const button = event.target;
-        button.disabled = false;
-        button.innerHTML = originalText;
+        displayFirewallError('Error creating backup: ' + error.message);
+        showToast('Error creating backup: ' + error.message, 'danger');
     }
+}
+
+async function showCurrentRules() {
+    try {
+        displayFirewallLoading('Loading current iptables rules...');
+        
+        const response = await fetch('/api/v1/firewall/status');
+        const data = await response.json();
+        
+        if (data.status === 'success' && data.current_rules.status === 'success') {
+            const rules = data.current_rules.rules.split('\\n').filter(rule => rule.trim());
+            const accessStatus = data.iptables_access.status === 'success' ? 
+                '✅ iptables Access OK' : '❌ No iptables Access';
+            
+            const rulesWithHeader = [
+                '# Current iptables status',
+                `# ${accessStatus}`,
+                '# ' + data.iptables_access.message,
+                '',
+                ...rules
+            ];
+            
+            displayFirewallContent(rulesWithHeader, 'Current iptables rules');
+        } else {
+            displayFirewallError('Error loading current rules: ' + (data.current_rules?.message || data.message || 'Unknown error'));
+        }
+    } catch (error) {
+        displayFirewallError('Error loading current rules: ' + error.message);
+        showToast('Error loading current rules: ' + error.message, 'danger');
+    }
+}
+
+function copyAllFirewallRules() {
+    if (!window.currentFirewallRules || window.currentFirewallRules.length === 0) {
+        showToast('No rules to copy', 'warning');
+        return;
+    }
+    
+    const scriptContent = generateFirewallScript(window.currentFirewallRules);
+    
+    navigator.clipboard.writeText(scriptContent).then(() => {
+        showToast(`Copied all ${window.currentFirewallRules.length} firewall rules to clipboard`, 'success');
+    }).catch(err => {
+        console.error('Failed to copy rules:', err);
+        showToast('Failed to copy rules to clipboard', 'danger');
+    });
+}
+
+function downloadFirewallRules() {
+    if (!window.currentFirewallRules || window.currentFirewallRules.length === 0) {
+        showToast('No rules to download', 'warning');
+        return;
+    }
+    
+    const scriptContent = generateFirewallScript(window.currentFirewallRules);
+    
+    const blob = new Blob([scriptContent], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'wireguard_firewall_rules.sh';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    showToast('Downloaded firewall script: wireguard_firewall_rules.sh', 'success');
+}
+
+function generateFirewallScript(rules) {
+    const timestamp = new Date().toISOString();
+    
+    let script = `#!/bin/bash
+# WireGuard Firewall Rules
+# Generated on: ${timestamp}
+# 
+# Usage: sudo ./$(basename "$0")
+# 
+# This script applies iptables rules for WireGuard peers.
+# Make sure to review the rules before applying them.
+
+set -e  # Exit on error
+
+echo "Applying WireGuard firewall rules"
+echo "Generated on: ${timestamp}"
+echo ""
+
+`;
+
+    rules.forEach(rule => {
+        if (rule.startsWith('#')) {
+            script += `${rule}\\n`;
+        } else if (rule.trim() !== '') {
+            script += `echo "Executing: ${rule}"\\n`;
+            script += `${rule}\\n`;
+        }
+        script += '\\n';
+    });
+
+    script += `
+echo ""
+echo "✓ All firewall rules applied successfully"
+echo "Current FORWARD chain rules:"
+iptables -L FORWARD -n --line-numbers
+`;
+
+    return script;
+}
+
+function showConfirmationToast(title, message) {
+    return new Promise((resolve) => {
+        const confirmed = confirm(`${title}\\n\\n${message}`);
+        resolve(confirmed);
+    });
 }
 </script>
 {% endblock %}

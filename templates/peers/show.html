@@ -4,6 +4,7 @@
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/console.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/traffic-graph.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -326,14 +327,64 @@ PersistentKeepalive = {{ peer.persistent_keepalive or 25 }}</code></pre>
             <div class="card-header">
                 <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Connection Status</h5>
             </div>
-            <div class="card-body text-center">
-                <div class="mb-3">
-                    <i class="fas fa-question-circle fa-3x text-muted"></i>
+            <div class="card-body">
+                <!-- Connection Status Indicator -->
+                <div class="text-center mb-4">
+                    <div class="connection-indicator justify-content-center mb-3">
+                        <div class="connection-dot" id="connection-dot-{{ peer.id }}" title="Connection status" style="width: 40px; height: 40px;">
+                            <div class="dot-inner"></div>
+                        </div>
+                    </div>
+                    <div id="connection-text-detailed-{{ peer.id }}" class="mb-3">
+                        <span class="text-muted">Checking...</span>
+                    </div>
                 </div>
-                <p class="text-muted">Connection status monitoring not implemented yet.</p>
-                <small class="text-muted">
-                    Future feature: Real-time connection status, last seen, data transfer statistics.
-                </small>
+
+                <!-- Traffic Graph Section -->
+                <div class="traffic-graph-container position-relative mb-3">
+                    <canvas id="traffic-graph-{{ peer.id }}" class="traffic-graph" width="100" height="60"></canvas>
+                    <div class="traffic-overlay">
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <div class="border-end">
+                                    <h6 class="text-muted mb-1">Transfer Data</h6>
+                                    <div id="transfer-{{ peer.id }}">
+                                        <div class="transfer-info">
+                                            <div class="transfer-rx">↓ --</div>
+                                            <div class="transfer-tx">↑ --</div>
+                                        </div>
+                                    </div>
+                                    <div id="traffic-rates-{{ peer.id }}" class="mt-1">
+                                        <div class="traffic-rates">
+                                            <div class="rate-item">
+                                                <span class="rate-icon text-primary">↓</span>
+                                                <span class="rate-value">0 B/s</span>
+                                            </div>
+                                            <div class="rate-item">
+                                                <span class="rate-icon text-warning">↑</span>
+                                                <span class="rate-value">0 B/s</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <h6 class="text-muted mb-1">Client Info</h6>
+                                <div id="client-info-{{ peer.id }}">
+                                    <small class="text-muted">Loading...</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Last Update Info -->
+                <div class="mt-3 pt-3 border-top text-center">
+                    <small class="text-muted">
+                        <i class="fas fa-bolt me-1"></i>
+                        Real-time updates via WebSocket
+                    </small>
+                </div>
             </div>
         </div>
 
@@ -474,20 +525,41 @@ PersistentKeepalive = {{ peer.persistent_keepalive or 25 }}</code></pre>
 {% endblock %}
 
 {% block scripts %}
+<!-- Socket.IO Client -->
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<!-- Chart.js for traffic graphs -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js"></script>
+
 <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
 <script src="{{ url_for('static', filename='js/console.js') }}"></script>
 <script src="{{ url_for('static', filename='js/qr-code.js') }}"></script>
+<script src="{{ url_for('static', filename='js/websocket-manager.js') }}"></script>
 
 <script>
-async function togglePeerStatus(toggleElement) {
-    const peerId = toggleElement.dataset.peerId;
+function togglePeerStatus(toggleElement) {
+    const peerId = parseInt(toggleElement.dataset.peerId);
     const peerName = toggleElement.dataset.peerName;
     const isActive = toggleElement.checked;
     const action = isActive ? 'activate' : 'deactivate';
-    const endpoint = isActive ? 'activate' : 'deactivate';
     
     // Disable the toggle during the request
     toggleElement.disabled = true;
+    
+    // Use WebSocket if available, fallback to HTTP
+    if (window.wsManager && window.wsManager.isConnected) {
+        if (isActive) {
+            window.wsManager.activatePeer(peerId);
+        } else {
+            window.wsManager.deactivatePeer(peerId);
+        }
+    } else {
+        // Fallback to HTTP API
+        togglePeerStatusHTTP(toggleElement, peerId, peerName, isActive, action);
+    }
+}
+
+async function togglePeerStatusHTTP(toggleElement, peerId, peerName, isActive, action) {
+    const endpoint = isActive ? 'activate' : 'deactivate';
     
     try {
         const response = await fetch(`/api/v1/peers/${peerId}/${endpoint}`, {
@@ -497,23 +569,13 @@ async function togglePeerStatus(toggleElement) {
             }
         });
         
-        // Check if response is ok and has content
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
-        const responseText = await response.text();
-        let data;
-        
-        try {
-            data = JSON.parse(responseText);
-        } catch (parseError) {
-            // If JSON parsing fails, show the raw response
-            throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}`);
-        }
+        const data = await response.json();
         
         if (data.status === 'success') {
-            // Update the label text and color
             const label = document.querySelector(`label[for="peer-toggle-${peerId}"] span`);
             if (isActive) {
                 label.textContent = 'Active';
@@ -523,19 +585,15 @@ async function togglePeerStatus(toggleElement) {
                 label.className = 'text-warning fw-bold';
             }
             
-            // Show success message
             showToast(`Peer "${peerName}" ${action}d successfully!`, 'success');
         } else {
-            // Revert the toggle on error
             toggleElement.checked = !isActive;
             showToast(`Error ${action}ing peer: ${data.message || 'Unknown error'}`, 'danger');
         }
     } catch (error) {
-        // Revert the toggle on error
         toggleElement.checked = !isActive;
         showToast(`Error ${action}ing peer: ${error.message}`, 'danger');
     } finally {
-        // Re-enable the toggle
         toggleElement.disabled = false;
     }
 }
@@ -621,5 +679,18 @@ async function applyFirewallRules(peerId, dryRun = false) {
         button.innerHTML = originalText;
     }
 }
+
+// Initialize live status updates when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.LiveStatusManager) {
+        const statusManager = new LiveStatusManager();
+        statusManager.start();
+        
+        // Stop updates when leaving the page
+        window.addEventListener('beforeunload', function() {
+            statusManager.stop();
+        });
+    }
+});
 </script>
 {% endblock %}

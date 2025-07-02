@@ -2,7 +2,7 @@ from flask import request, jsonify, render_template, Response, redirect, url_for
 from app import app, db
 from app.models import Peer, AllowedIP, FirewallRule
 from app.utils import generate_wg0_conf, validate_peer_data, get_next_available_ip, validate_multiple_allowed_ips, apply_iptables_rules, get_current_iptables_rules, validate_iptables_access, backup_iptables_rules, restore_iptables_rules, generate_iptables_rules, generate_peer_qr_code
-from app.wireguard_status import get_wireguard_status, get_peer_connection_status, format_bytes, format_time_ago
+from app.wireguard_status import get_wireguard_status, get_peer_connection_status, format_bytes, format_time_ago, format_duration
 import subprocess
 import os
 import re
@@ -710,6 +710,7 @@ def download_config(peer_name):
     peer = Peer.query.filter_by(name=peer_name).first_or_404()
     return redirect(url_for('download_peer_config', peer_id=peer.id))
 
+
 # Firewall/iptables Management Routes
 @app.route('/api/v1/firewall/status', methods=['GET'])
 def api_firewall_status():
@@ -986,7 +987,9 @@ def api_wireguard_status():
                 'is_active': peer.is_active,
                 'is_connected': live_data.get('is_connected', False),
                 'endpoint': live_data.get('endpoint'),
+                'client_ip': live_data.get('client_ip'),
                 'latest_handshake': format_time_ago(live_data.get('latest_handshake')),
+                'connection_duration': format_duration(live_data.get('connection_duration_seconds')),
                 'transfer_rx': live_data.get('transfer_rx', 0),
                 'transfer_tx': live_data.get('transfer_tx', 0),
                 'transfer_rx_formatted': format_bytes(live_data.get('transfer_rx', 0)),

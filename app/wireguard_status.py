@@ -94,8 +94,24 @@ def parse_wg_show_output(output: str) -> Dict[str, Dict]:
             time_diff = datetime.now(timezone.utc) - peer_data['latest_handshake']
             # Consider connected if handshake was within last 3 minutes
             peer_data['is_connected'] = time_diff.total_seconds() < 180
+            
+            # Extract client IP from endpoint if available
+            if peer_data['endpoint']:
+                try:
+                    # Endpoint format is typically "IP:PORT"
+                    client_ip = peer_data['endpoint'].split(':')[0]
+                    peer_data['client_ip'] = client_ip
+                except:
+                    peer_data['client_ip'] = None
+            else:
+                peer_data['client_ip'] = None
+                
+            # Calculate connection duration (approximate)
+            peer_data['connection_duration_seconds'] = time_diff.total_seconds()
         else:
             peer_data['is_connected'] = False
+            peer_data['client_ip'] = None
+            peer_data['connection_duration_seconds'] = None
     
     return peers
 
@@ -245,6 +261,30 @@ def format_time_ago(dt: datetime) -> str:
     else:
         days = int(diff.total_seconds() / 86400)
         return f"{days}d ago"
+
+
+def format_duration(seconds: float) -> str:
+    """Format duration in seconds to human readable string"""
+    if not seconds or seconds < 0:
+        return "0s"
+    
+    if seconds < 60:
+        return f"{int(seconds)}s"
+    elif seconds < 3600:
+        minutes = int(seconds / 60)
+        return f"{minutes}m"
+    elif seconds < 86400:
+        hours = int(seconds / 3600)
+        minutes = int((seconds % 3600) / 60)
+        if minutes > 0:
+            return f"{hours}h {minutes}m"
+        return f"{hours}h"
+    else:
+        days = int(seconds / 86400)
+        hours = int((seconds % 86400) / 3600)
+        if hours > 0:
+            return f"{days}d {hours}h"
+        return f"{days}d"
 
 
 # Fix import for timedelta
