@@ -331,7 +331,7 @@ Address = {client_address}
 [Peer]
 PublicKey = {server_public_key}
 PresharedKey = {peer.preshared_key}
-Endpoint = {server_ip}:{listen_port}
+Endpoint = {server_public_ip}:{listen_port}
 AllowedIPs = 0.0.0.0/0
 PersistentKeepalive = {peer.persistent_keepalive or 25}
 """

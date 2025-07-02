@@ -1,165 +1,381 @@
-# WireGuard Peer Management Web App
+# 🔐 WireGuard Management System
 
-A professional Flask-based web application for managing WireGuard VPN peers with advanced security features, QR code generation, and comprehensive firewall rule management.
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
+[![Flask](https://img.shields.io/badge/flask-%23000.svg?style=flat&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-green.svg)](https://github.com/features/actions)
+[![Tests](https://img.shields.io/badge/Tests-Pytest-orange.svg)](https://pytest.org/)
+[![Code Style](https://img.shields.io/badge/Code%20Style-Black-black.svg)](https://black.readthedocs.io/)
 
-## 🌟 Key Features
+A professional, enterprise-ready web application for managing WireGuard VPN peers with **real-time monitoring**, **advanced firewall management**, and **WebSocket-powered live updates**.
 
-### 🖥️ Modern Web Interface
-- **Responsive Design**: Bootstrap-powered UI with professional styling
-- **Real-time Validation**: Form validation with instant feedback
-- **Intuitive Navigation**: Clean, organized interface for all operations
-- **Mobile-Friendly**: Optimized for desktop and mobile devices
+> ⚠️ **Development Status**: This project is actively under development. The firewall management and VPN functionality are experimental and may contain bugs. Use with caution in production environments.
 
-### 👥 Peer Management
-- **Auto-Assignment**: Automatically assigns next available IP address
-- **Secure Key Generation**: Auto-generates preshared keys for enhanced security
-- **Advanced IP Management**: Support for additional allowed IP ranges with descriptions
-- **Peer Status Control**: Enable/disable peers without deletion
-- **Comprehensive Validation**: Prevents duplicate names, keys, and IP conflicts
+## ✨ **Key Features**
 
-### 📱 QR Code Integration
-- **Mobile Configuration**: Generate QR codes for easy mobile device setup
-- **Download Support**: Save QR codes as PNG files
-- **Instant Preview**: Modal-based QR code display
-- **WireGuard App Compatible**: Direct import into WireGuard mobile apps
+### 🚀 **Real-Time Monitoring**
+- **Live Status Updates** via WebSockets (2-second intervals)
+- **Traffic Graphs** showing upload/download rates for last 40 seconds
+- **Connection Monitoring** with visual indicators
+- **Automatic Reconnection** with fallback to HTTP polling
 
-### 🛡️ Advanced Firewall Management
-- **Rule Templates**: Predefined security templates (Unrestricted, Internet Only, Restricted, Admin, Guest)
-- **Custom Rules**: Create granular firewall rules with multiple criteria
-- **iptables Integration**: Generate and preview iptables rules
-- **Console Interface**: Professional terminal-style iptables preview with copy/download
-- **Rule Priorities**: Organize rules with priority levels
+### 👥 **Advanced Peer Management**
+- **Auto-IP Assignment** with conflict detection
+- **Bulk Operations** with validation
+- **Multiple Allowed IPs** with descriptions
+- **QR Code Generation** for mobile devices
+- **Configuration Export** (file download + API)
 
-### 🔧 Professional Architecture
-- **Modular Design**: Separated CSS, JavaScript, and template files
-- **DRY Principles**: Eliminated code duplication across templates
-- **Template Inheritance**: Unified form templates for create/edit operations
-- **Static Asset Organization**: Professional file structure with organized assets
+### 🛡️ **Enterprise Firewall Management** ⚠️ *Experimental*
+- **iptables Integration** with rule preview
+- **Security Templates** (Admin, Guest, Restricted, etc.)
+- **Custom Rule Builder** with priorities
+- **Terminal-Style Interface** for rule management
+- **Dry-Run Testing** before applying rules
+- *Note: Firewall features are experimental and may require manual intervention*
 
-### 🚀 RESTful API
-- **Complete CRUD Operations**: Full peer management via REST API
-- **Firewall Rule API**: Programmatic firewall rule management
-- **Configuration Export**: Download configurations via API
-- **Status Management**: API endpoints for peer activation/deactivation
+### 🔧 **Professional Architecture**
+- **REST API** with full CRUD operations
+- **WebSocket Events** for real-time communication
+- **Docker Support** with production-ready setup
+- **Modular Design** with separated concerns
+- **Comprehensive Logging** and error handling
 
-## 🚀 Quick Start
+## 🎯 **Quick Start**
 
-### Prerequisites
-- Python 3.8+
-- WireGuard tools installed (`wg`, `wg-quick`)
-- iptables (for firewall management)
+### **Using Make Commands (Recommended)**
 
-### Installation
+```bash
+# Clone repository
+git clone https://github.com/Friedjof/WireguardAdmin.git
+cd wireguard-management
 
-1. **Clone and setup:**
-   ```bash
-   git clone <repository-url>
-   cd vpn
-   pip install -r requirements.txt
-   ```
+# Show all available commands
+make help
 
-2. **Configure environment:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your server details:
-   # SERVER_PUBLIC_KEY=your_server_public_key
-   # SERVER_IP=your_server_ip
-   # LISTEN_PORT=51820
-   ```
+# Setup development environment
+make setup
 
-3. **Initialize database:**
-   ```bash
-   python migrate_database.py
-   ```
+# Run tests and linting
+make check
 
-4. **Run the application:**
-   ```bash
-   python app.py
-   ```
-
-5. **Access the interface:**
-   - Web UI: [http://localhost:5000](http://localhost:5000)
-   - API: [http://localhost:5000/api/v1/](http://localhost:5000/api/v1/)
-
-## 📖 Usage Guide
-
-### Creating Peers
-1. Navigate to "Add New Peer"
-2. Enter peer name and public key (or generate one)
-3. Configure additional allowed IPs if needed
-4. Set up firewall rules using templates or custom rules
-5. Save and download the configuration or scan the QR code
-
-### Firewall Templates
-- **🔓 Unrestricted**: Full access to all networks
-- **🌐 Internet Only**: Internet access without peer communication
-- **🔒 Restricted**: Custom rules for specific access
-- **👑 Administrator**: Full administrative access
-- **👥 Guest**: Limited access with basic internet
-
-### QR Code Usage
-1. Click "Show QR Code" on any peer
-2. Scan with WireGuard mobile app
-3. Replace placeholder with client's private key
-4. Connect instantly
-
-## 🏗️ Architecture
-
-### Professional File Structure
-```
-vpn/
-├── app/
-│   ├── models.py          # Database models
-│   ├── routes.py          # Web routes and API endpoints
-│   └── utils.py           # Utility functions
-├── static/
-│   ├── css/
-│   │   └── console.css    # Terminal-style interface
-│   └── js/
-│       ├── utils.js       # General utilities
-│       ├── console.js     # iptables console
-│       ├── firewall.js    # Firewall management
-│       ├── peer-form.js   # Form validation
-│       └── qr-code.js     # QR code functionality
-├── templates/
-│   ├── base.html          # Base template
-│   └── peers/
-│       ├── index.html     # Peer list
-│       ├── show.html      # Peer details
-│       └── form.html      # Unified create/edit form
-├── wg0.conf              # Generated WireGuard config
-└── instance/wireguard.db # SQLite database
+# Start development server
+make dev
 ```
 
-### Key Components
-- **Flask Application**: Modern web framework with Jinja2 templating
-- **SQLAlchemy ORM**: Database abstraction with relationship management
-- **Bootstrap UI**: Responsive, professional interface
-- **Modular JavaScript**: Separated concerns with reusable components
+### **Docker Deployment**
 
-## 🔌 API Reference
+```bash
+# Configure environment
+cp .env.example .env
+# Edit .env with your server details
 
-### Peer Management
-- `GET /api/v1/peers` - List all peers
-- `POST /api/v1/peers` - Create new peer
-- `GET /api/v1/peers/<id>` - Get peer details
-- `PUT /api/v1/peers/<id>` - Update peer
-- `DELETE /api/v1/peers/<id>` - Delete peer
-- `GET /api/v1/peers/<id>/config` - Download configuration
-- `GET /api/v1/peers/<id>/qrcode` - Get QR code
+# Build and start with Docker
+make build
+make up
 
-### Firewall Management
-- `GET /api/v1/firewall/status` - Check iptables access
-- `GET /api/v1/firewall/rules/generate` - Generate rules preview
-- `POST /api/v1/firewall/rules/apply` - Apply rules to system
-- `GET /api/v1/peers/<id>/firewall-rules` - List peer rules
-- `POST /api/v1/peers/<id>/firewall-rules` - Create rule
-- `PUT /api/v1/firewall-rules/<id>` - Update rule
-- `DELETE /api/v1/firewall-rules/<id>` - Delete rule
+# Check status
+make status
 
-### Utilities
-- `GET /api/v1/next-ip` - Get next available IP address
+# Access web interface
+open http://localhost:5000
+```
 
-## License
+### **Manual Installation**
 
-MIT License
+```bash
+# Install system dependencies
+sudo apt update
+sudo apt install wireguard-tools iptables python3 python3-pip
+
+# Clone and setup
+git clone https://github.com/Friedjof/WireguardAdmin.git
+cd wireguard-management
+
+# Setup with Make
+make setup
+
+# Or manually
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your configuration
+
+# Run application
+python app.py
+```
+
+## 📊 **Screenshots & Demo**
+
+<details>
+<summary>🖼️ **Click to view screenshots**</summary>
+
+### Dashboard with Real-Time Monitoring
+![Dashboard](docs/images/dashboard.png)
+
+### Peer Details with Traffic Graph
+![Peer Details](docs/images/peer-details.png)
+
+### Firewall Management Console
+![Firewall Console](docs/images/firewall-console.png)
+
+### Mobile QR Code Setup
+![QR Code](docs/images/qr-code.png)
+
+</details>
+
+## 🏗️ **Architecture**
+
+```
+wireguard-management/
+├── 📁 app/                    # Core application
+│   ├── 🐍 __init__.py        # Flask app & WebSocket setup
+│   ├── 🗃️  models.py          # Database models
+│   ├── 🛣️  routes.py          # Web routes & API endpoints
+│   ├── ⚙️  utils.py           # Utility functions
+│   ├── 🔥 iptables_manager.py # Firewall management
+│   ├── 📡 websocket_manager.py # Real-time updates
+│   ├── 🔌 websocket_events.py # WebSocket event handlers
+│   └── 📊 wireguard_status.py # Status monitoring
+├── 📁 static/                 # Frontend assets
+│   ├── 🎨 css/               # Stylesheets
+│   └── ⚡ js/                # JavaScript modules
+├── 📁 templates/              # Jinja2 templates
+├── 📁 docker/                 # Docker configuration
+├── 📁 docs/                   # Documentation
+├── 📁 scripts/                # Utility scripts
+└── 🐳 docker-compose.yml     # Production setup
+```
+
+## 🔌 **API Reference**
+
+### **Peer Management**
+```http
+GET    /api/v1/peers              # List all peers
+POST   /api/v1/peers              # Create new peer
+GET    /api/v1/peers/{id}         # Get peer details
+PUT    /api/v1/peers/{id}         # Update peer
+DELETE /api/v1/peers/{id}         # Delete peer
+POST   /api/v1/peers/{id}/toggle  # Toggle peer status
+```
+
+### **Real-Time WebSocket Events**
+```javascript
+// Connect to WebSocket
+const socket = io();
+
+// Listen for real-time updates
+socket.on('peer_status_update', (data) => {
+  // data.data contains all peer statuses
+  // data.data[peerId].graph_data contains traffic history
+});
+
+// Activate/deactivate peers
+socket.emit('peer_action', {
+  peer_id: 123,
+  action: 'activate' // or 'deactivate'
+});
+```
+
+### **Firewall Management**
+```http
+GET  /api/v1/firewall/status           # Check iptables access
+GET  /api/v1/firewall/rules/generate   # Preview generated rules
+POST /api/v1/firewall/rules/apply      # Apply rules to system
+POST /api/v1/firewall/backup           # Backup current rules
+```
+
+## 🛡️ **Security Features**
+
+> ⚠️ **Security Notice**: This application manages critical network infrastructure. The firewall and VPN features are experimental and should be thoroughly tested before production use. Always maintain backup access to your server.
+
+### **Built-in Security**
+- ✅ **Input Validation** with SQLAlchemy ORM protection
+- ✅ **Rate Limiting** on API endpoints
+- ✅ **CSRF Protection** on forms
+- ✅ **Secure Headers** with Flask-Talisman
+- ✅ **Environment-based Secrets** (no hardcoded keys)
+
+### **Network Security** ⚠️ *Experimental*
+- ⚠️ **iptables Integration** with custom rules *(may require manual fixes)*
+- ⚠️ **Firewall Templates** for different security levels *(test thoroughly)*
+- ⚠️ **Peer Isolation** options *(experimental feature)*
+- ✅ **Traffic Monitoring** and logging
+
+### **Production Deployment**
+- ✅ **Docker Security** with non-root user
+- ✅ **Reverse Proxy** support (nginx/Traefik)
+- ✅ **SSL/TLS** certificate integration
+- ✅ **Environment Isolation** with Docker networks
+
+## ⚙️ **Configuration**
+
+### **Environment Variables**
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `SERVER_PUBLIC_IP` | Your server's public IP/domain | - | ✅ |
+| `SERVER_PRIVATE_KEY` | WireGuard server private key | - | ✅ |
+| `SERVER_PUBLIC_KEY` | WireGuard server public key | - | ✅ |
+| `LISTEN_PORT` | WireGuard listen port | `51820` | ❌ |
+| `VPN_SUBNET` | VPN internal network | `10.0.0.0/24` | ❌ |
+| `FLASK_ENV` | Flask environment | `production` | ❌ |
+
+### **Docker Configuration**
+
+```yaml
+# docker-compose.yml
+services:
+  vpn-manager:
+    build: .
+    ports:
+      - "5000:5000"      # Web interface
+      - "51820:51820/udp" # WireGuard
+    environment:
+      - SERVER_PUBLIC_IP=your-server.com
+      - SERVER_PRIVATE_KEY=your_private_key
+      - SERVER_PUBLIC_KEY=your_public_key
+    volumes:
+      - ./instance:/app/instance    # Database persistence
+      - ./logs:/app/logs           # Logs
+      - ./backups:/app/backups     # Backups
+```
+
+## 🔧 **Development**
+
+### **Quick Development Setup**
+
+```bash
+# Clone repository
+git clone https://github.com/Friedjof/WireguardAdmin.git
+cd wireguard-management
+
+# Complete setup with one command
+make setup
+
+# Show all available commands
+make help
+```
+
+### **Development Commands**
+
+#### **🔧 Setup & Development**
+```bash
+make setup          # Setup development environment
+make install        # Install dependencies (alias for setup)
+make dev            # Start development server
+make clean          # Clean up development environment
+```
+
+#### **🧪 Testing & Quality**
+```bash
+make test           # Run all tests
+make test-watch     # Run tests in watch mode
+make lint           # Run linting checks (dry-run)
+make format         # Format code with Black
+make check          # Run all checks (lint + test)
+```
+
+#### **🐳 Docker Operations**
+```bash
+make build          # Build Docker container
+make up             # Start system (Docker)
+make down           # Stop system (Docker)
+make logs           # Show container logs
+make shell          # Open shell in container
+make restart        # Restart system
+make docker-clean   # Clean Docker resources
+```
+
+#### **📊 Monitoring & Operations**
+```bash
+make status         # Show system status
+make keys           # Show WireGuard server keys
+make backup         # Create backup of configuration
+```
+
+### **CI/CD Pipeline**
+
+The project includes automated CI/CD with GitHub Actions:
+
+- **Automated Testing**: All tests run on every push
+- **Code Quality**: Flake8 linting and Black formatting checks
+- **Release Automation**: Docker images built on version tags (`v*`)
+- **Container Registry**: Images pushed to GitHub Container Registry
+
+#### **Release Process**
+```bash
+# Create and push a release tag
+git tag v1.0.0
+git push origin v1.0.0
+
+# This automatically triggers:
+# 1. Run tests and linting
+# 2. Build Docker image
+# 3. Push to registry
+# 4. Create GitHub release
+```
+
+## 📋 **Requirements**
+
+### **System Requirements**
+- **Linux Server** (Ubuntu 22.04+ recommended)
+- **WireGuard Tools** (`wireguard-tools` package)
+- **iptables** (for firewall management)
+- **Docker** and **Docker Compose** (for containerized deployment)
+- **Make** (for development commands)
+
+### **Python Requirements**
+- **Python 3.12+**
+- **pytest** (testing framework)
+- **flake8** (code linting)
+- **black** (code formatting)
+- See `requirements.txt` for complete list
+
+### **Network Requirements**
+- **Open Port 51820/UDP** (WireGuard)
+- **Open Port 5000/TCP** (Web interface, can be proxied)
+- **Root Access** (for WireGuard and iptables management)
+
+## 🤝 **Contributing**
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### **Development Workflow**
+1. **Fork** the repository
+2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
+3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
+4. **Push** to the branch (`git push origin feature/amazing-feature`)
+5. **Open** a Pull Request
+
+### **Bug Reports**
+Please use the [GitHub Issues](https://github.com/Friedjof/WireguardAdmin/issues) for bug reports and feature requests.
+
+## 📄 **License**
+
+This project is licensed under the **GNU General Public License v3.0** - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 **Acknowledgments**
+
+- **WireGuard** team for the amazing VPN technology
+- **Flask** community for the excellent web framework
+- **Bootstrap** team for the responsive UI components
+- **Chart.js** for beautiful traffic visualization
+- **Socket.IO** for real-time communication
+
+## 📞 **Support**
+
+- 📖 **Documentation**: [Wiki](https://github.com/Friedjof/WireguardAdmin/wiki)
+- 🐛 **Bug Reports**: [Issues](https://github.com/Friedjof/WireguardAdmin/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/Friedjof/WireguardAdmin/discussions)
+- 📧 **Email**: support@your-domain.com
+
+---
+
+⭐ **Star this repository if it helped you!**
+
+Made with ❤️ by [Friedjof](https://github.com/Friedjof)

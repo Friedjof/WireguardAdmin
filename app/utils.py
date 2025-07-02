@@ -6,6 +6,7 @@ import ipaddress
 import qrcode
 import io
 import base64
+from app.iptables_manager import get_iptables_manager
 
 def generate_wg0_conf():
     server_private_key = os.getenv("SERVER_PRIVATE_KEY")
@@ -313,207 +314,69 @@ def is_valid_ip_network(network):
         return False
 
 def generate_iptables_rules(peer_id=None, vpn_interface='wg0'):
-    """Generate iptables rules for a specific peer or all peers"""
-    from app.models import Peer, FirewallRule
-    import subprocess
-    
-    rules = []
-    
-    # Base rules for WireGuard interface
-    rules.extend([
-        f"# Allow established and related connections",
-        f"iptables -A FORWARD -i {vpn_interface} -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT",
-        f"iptables -A FORWARD -o {vpn_interface} -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT",
-        f"# Allow loopback",
-        f"iptables -A INPUT -i lo -j ACCEPT",
-        f"iptables -A OUTPUT -o lo -j ACCEPT"
-    ])
-    
-    # Get peers to process
-    if peer_id:
-        peers = [Peer.query.get(peer_id)]
-        peers = [p for p in peers if p is not None]
-    else:
-        peers = Peer.query.filter_by(is_active=True).all()
-    
-    for peer in peers:
-        if not peer.assigned_ip:
-            continue
-            
-        peer_ip = peer.assigned_ip
-        rules.append(f"# Rules for peer: {peer.name} ({peer_ip})")
+    """Generate iptables rules for a specific peer or all peers using new iptables manager"""
+    try:
+        manager = get_iptables_manager(vpn_interface)
+        result = manager.apply_peer_rules(peer_id, dry_run=True)
         
-        # Get active firewall rules for this peer, sorted by priority
-        firewall_rules = FirewallRule.query.filter_by(
-            peer_id=peer.id, 
-            is_active=True
-        ).order_by(FirewallRule.priority).all()
-        
-        if not firewall_rules:
-            # Default: Allow all traffic for peers without specific rules
-            rules.append(f"iptables -A FORWARD -s {peer_ip}/32 -j ACCEPT")
-            rules.append(f"iptables -A FORWARD -d {peer_ip}/32 -j ACCEPT")
+        if result["status"] == "success":
+            return result["rules"]
         else:
-            # Apply custom rules
-            for rule in firewall_rules:
-                iptables_rule = convert_firewall_rule_to_iptables(rule, peer_ip, vpn_interface)
-                if iptables_rule:
-                    rules.append(iptables_rule)
-            
-            # Add default drop rule at the end for this peer if there are custom rules
-            rules.append(f"iptables -A FORWARD -s {peer_ip}/32 -j DROP")
-            rules.append(f"iptables -A FORWARD -d {peer_ip}/32 -j DROP")
-    
-    return rules
+            return [f"# Error generating rules: {result['message']}"]
+    except Exception as e:
+        return [f"# Error: {str(e)}"]
 
+# Legacy function kept for backward compatibility but now uses new iptables manager
 def convert_firewall_rule_to_iptables(rule, peer_ip, vpn_interface='wg0'):
-    """Convert a FirewallRule object to iptables command"""
-    
-    # Base command
-    cmd_parts = ["iptables", "-A", "FORWARD"]
-    
-    # Source IP
-    if rule.source:
-        cmd_parts.extend(["-s", rule.source])
-    else:
-        cmd_parts.extend(["-s", f"{peer_ip}/32"])
-    
-    # Destination IP
-    if rule.destination:
-        cmd_parts.extend(["-d", rule.destination])
-    elif rule.rule_type.value == 'internet':
-        cmd_parts.extend(["-d", "0.0.0.0/0"])
-    elif rule.rule_type.value == 'peer_comm':
-        # Get VPN subnet for peer communication
-        vpn_subnet = os.getenv("VPN_SUBNET", "10.0.0.0/24")
-        cmd_parts.extend(["-d", vpn_subnet])
-    
-    # Protocol
-    if rule.protocol and rule.protocol.value != 'any':
-        cmd_parts.extend(["-p", rule.protocol.value])
-        
-        # Port range (only for TCP/UDP)
-        if rule.port_range and rule.port_range != 'any' and rule.protocol.value in ['tcp', 'udp']:
-            if '-' in rule.port_range:
-                # Port range (e.g., "80-443")
-                cmd_parts.extend(["--dport", rule.port_range])
-            else:
-                # Single port
-                cmd_parts.extend(["--dport", rule.port_range])
-    
-    # Interface constraints
-    if rule.rule_type.value == 'internet':
-        cmd_parts.extend(["-o", f"!{vpn_interface}"])  # Not going to VPN interface
-    else:
-        cmd_parts.extend(["-i", vpn_interface])  # Coming from VPN interface
-    
-    # Action
-    action = "ACCEPT" if rule.action.value == "ALLOW" else "DROP"
-    cmd_parts.extend(["-j", action])
-    
-    # Add comment
-    cmd_parts.extend(["-m", "comment", "--comment", f"Rule:{rule.name}"])
-    
-    return " ".join(cmd_parts)
+    """Convert a FirewallRule object to iptables command (legacy function for compatibility)"""
+    try:
+        manager = get_iptables_manager(vpn_interface)
+        if hasattr(manager, '_convert_firewall_rule_to_iptables_preview'):
+            return manager._convert_firewall_rule_to_iptables_preview(rule, peer_ip)
+        else:
+            # Fallback to basic implementation
+            cmd_parts = ["iptables", "-A", "FORWARD"]
+            cmd_parts.extend(["-s", f"{peer_ip}/32"])
+            action = "ACCEPT" if rule.action.value == "ALLOW" else "DROP"
+            cmd_parts.extend(["-j", action])
+            cmd_parts.extend(["-m", "comment", "--comment", f"Rule:{rule.name}"])
+            return " ".join(cmd_parts)
+    except Exception as e:
+        return f"# Error converting rule: {str(e)}"
 
 def apply_iptables_rules(peer_id=None, dry_run=False):
-    """Apply iptables rules to the system"""
-    import subprocess
-    
+    """Apply iptables rules to the system using new iptables manager"""
     try:
-        # Generate rules
-        rules = generate_iptables_rules(peer_id)
-        
-        if dry_run:
-            return {"status": "success", "rules": rules, "message": "Dry run completed"}
-        
-        # Clear existing VPN-related rules (be careful!)
-        clear_commands = [
-            "iptables -F FORWARD",  # Flush FORWARD chain
-        ]
-        
-        # Apply clearing commands
-        for cmd in clear_commands:
-            result = subprocess.run(cmd.split(), capture_output=True, text=True, check=False)
-            if result.returncode != 0:
-                return {"status": "error", "message": f"Failed to clear rules: {result.stderr}"}
-        
-        # Apply new rules
-        applied_rules = []
-        for rule in rules:
-            if rule.startswith('#'):
-                continue  # Skip comments
-            
-            result = subprocess.run(rule.split(), capture_output=True, text=True, check=False)
-            if result.returncode == 0:
-                applied_rules.append(rule)
-            else:
-                return {
-                    "status": "error", 
-                    "message": f"Failed to apply rule: {rule}. Error: {result.stderr}",
-                    "applied_rules": applied_rules
-                }
-        
-        return {
-            "status": "success", 
-            "message": f"Applied {len(applied_rules)} iptables rules",
-            "applied_rules": applied_rules
-        }
-        
+        vpn_interface = os.getenv("VPN_INTERFACE", "wg0")
+        manager = get_iptables_manager(vpn_interface)
+        return manager.apply_peer_rules(peer_id, dry_run)
     except Exception as e:
         return {"status": "error", "message": f"Error applying iptables rules: {str(e)}"}
 
 def get_current_iptables_rules():
-    """Get current iptables rules"""
-    import subprocess
-    
+    """Get current iptables rules using new iptables manager"""
     try:
-        result = subprocess.run(
-            ["iptables", "-L", "FORWARD", "-n", "-v", "--line-numbers"], 
-            capture_output=True, text=True, check=True
-        )
-        return {"status": "success", "rules": result.stdout}
-    except subprocess.CalledProcessError as e:
-        return {"status": "error", "message": f"Failed to get iptables rules: {e.stderr}"}
+        vpn_interface = os.getenv("VPN_INTERFACE", "wg0")
+        manager = get_iptables_manager(vpn_interface)
+        return manager.get_current_rules()
     except Exception as e:
         return {"status": "error", "message": f"Error getting iptables rules: {str(e)}"}
 
 def validate_iptables_access():
-    """Check if the application has permission to modify iptables"""
-    import subprocess
-    
+    """Check if the application has permission to modify iptables using new iptables manager"""
     try:
-        # Try to list rules (read-only test)
-        result = subprocess.run(
-            ["iptables", "-L", "-n"], 
-            capture_output=True, text=True, check=True
-        )
-        return {"status": "success", "message": "iptables access confirmed"}
-    except subprocess.CalledProcessError as e:
-        return {"status": "error", "message": f"No iptables access: {e.stderr}"}
-    except FileNotFoundError:
-        return {"status": "error", "message": "iptables not found on system"}
+        vpn_interface = os.getenv("VPN_INTERFACE", "wg0")
+        manager = get_iptables_manager(vpn_interface)
+        return manager.validate_access()
     except Exception as e:
         return {"status": "error", "message": f"Error checking iptables access: {str(e)}"}
 
 def backup_iptables_rules():
-    """Create a backup of current iptables rules"""
-    import subprocess
-    from datetime import datetime
-    
+    """Create a backup of current iptables rules using new iptables manager"""
     try:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_file = f"iptables_backup_{timestamp}.txt"
-        
-        result = subprocess.run(
-            ["iptables-save"], 
-            capture_output=True, text=True, check=True
-        )
-        
-        with open(backup_file, 'w') as f:
-            f.write(result.stdout)
-        
-        return {"status": "success", "backup_file": backup_file, "message": f"Backup saved to {backup_file}"}
+        vpn_interface = os.getenv("VPN_INTERFACE", "wg0")
+        manager = get_iptables_manager(vpn_interface)
+        return manager.backup_rules()
     except Exception as e:
         return {"status": "error", "message": f"Error creating backup: {str(e)}"}
 
@@ -534,7 +397,10 @@ def restore_iptables_rules(backup_file):
             capture_output=True, check=True
         )
         
-        return {"status": "success", "message": f"Rules restored from {backup_file}"}
+        if result.returncode == 0:
+            return {"status": "success", "message": f"Rules restored from {backup_file}"}
+        else:
+            return {"status": "error", "message": f"Failed to restore rules: {result.stderr}"}
     except Exception as e:
         return {"status": "error", "message": f"Error restoring rules: {str(e)}"}
 

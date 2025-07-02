@@ -1,0 +1,194 @@
+/* Traffic Graph Styles for Peer Details */
+
+.traffic-graph-container {
+    position: relative;
+    height: 120px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.traffic-graph {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.3;
+    z-index: 1;
+}
+
+.traffic-overlay {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(2px);
+}
+
+.traffic-rates {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.75rem;
+}
+
+.rate-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.rate-icon {
+    font-weight: bold;
+    font-size: 0.8rem;
+}
+
+.rate-value {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-weight: 500;
+    min-width: 45px;
+    text-align: left;
+}
+
+/* Enhanced transfer info styles */
+.transfer-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.85rem;
+}
+
+.transfer-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.transfer-icon {
+    font-weight: bold;
+    width: 12px;
+    text-align: center;
+}
+
+.transfer-value {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-weight: 500;
+    min-width: 40px;
+}
+
+/* Compact layouts for smaller values */
+.transfer-info.compact {
+    font-size: 0.75rem;
+}
+
+.transfer-info.ultra-compact {
+    font-size: 0.7rem;
+}
+
+.transfer-info.ultra-compact .transfer-value {
+    min-width: 35px;
+}
+
+/* Tooltip styles */
+.transfer-tooltip {
+    position: relative;
+    cursor: help;
+}
+
+.transfer-tooltip:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    z-index: 1000;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .traffic-graph-container {
+        background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+    }
+    
+    .traffic-overlay {
+        background: rgba(45, 55, 72, 0.8);
+        color: #e2e8f0;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .traffic-graph-container {
+        height: 100px;
+    }
+    
+    .traffic-rates,
+    .transfer-info {
+        font-size: 0.7rem;
+    }
+    
+    .rate-value,
+    .transfer-value {
+        min-width: 35px;
+    }
+}
+
+/* Animation for smooth updates */
+.traffic-rates .rate-value,
+.transfer-info .transfer-value {
+    transition: all 0.3s ease;
+}
+
+/* Connection status enhancements */
+.connection-dot {
+    position: relative;
+    display: inline-block;
+    border-radius: 50%;
+    border: 2px solid #dee2e6;
+    transition: all 0.3s ease;
+}
+
+.connection-dot.connected {
+    border-color: #28a745;
+    background: radial-gradient(circle, #28a745 30%, transparent 70%);
+    animation: pulse-connected 2s infinite;
+}
+
+.connection-dot.disconnected {
+    border-color: #dc3545;
+    background: #fff;
+}
+
+.connection-dot.checking {
+    border-color: #ffc107;
+    background: radial-gradient(circle, #ffc107 30%, transparent 70%);
+    animation: pulse-checking 1s infinite;
+}
+
+@keyframes pulse-connected {
+    0%, 100% { 
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.4);
+    }
+    50% { 
+        box-shadow: 0 0 0 8px rgba(40, 167, 69, 0);
+    }
+}
+
+@keyframes pulse-checking {
+    0%, 100% { 
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4);
+    }
+    50% { 
+        box-shadow: 0 0 0 6px rgba(255, 193, 7, 0);
+    }
+}
