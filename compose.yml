@@ -13,24 +13,12 @@ services:
       - "5000:5000"       # Web interface
       - "51820:51820/udp" # WireGuard VPN port
     volumes:
-      - ./instance:/app/instance                   # Database persistence
-      - ./logs:/app/logs                           # Application logs
-      - ./backups:/app/backups                     # Configuration backups
-      - vpn_wireguard_config:/etc/wireguard        # WireGuard system config
-    environment:
-      # WireGuard Configuration
-      - VPN_SERVER_IP=10.0.0.1      # VPN internal server IP (first IP in subnet)
-      - SERVER_PUBLIC_IP=172.24.0.2 # Replace with your server's public IP/domain
-      - LISTEN_PORT=51820
-      - VPN_SUBNET=10.0.0.0/24
-      
-      # Optional: Set your own keys (will be generated if not provided)
-      - SERVER_PRIVATE_KEY=8Cp9b08QVm61WQtWTM/7lQADjGIIy9wlgoysnf4kFH8=
-      - SERVER_PUBLIC_KEY=ngDV+vQNaJW5D+tKWBJox4j2MmB+IrooH/Q8i58QB0M=
-      
-      # Flask Configuration
-      - FLASK_ENV=production
-      - FLASK_DEBUG=false
+      - ./instance:/app/instance            # Database persistence
+      - ./logs:/app/logs                    # Application logs
+      - ./backups:/app/backups              # Configuration backups
+      - vpn_wireguard_config:/etc/wireguard # WireGuard system config
+    env_file:
+      - .env
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/"]
