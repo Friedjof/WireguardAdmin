@@ -372,7 +372,7 @@ This project is licensed under the **GNU General Public License v3.0** - see the
 - 📖 **Documentation**: [Wiki](https://github.com/Friedjof/WireguardAdmin/wiki)
 - 🐛 **Bug Reports**: [Issues](https://github.com/Friedjof/WireguardAdmin/issues)
 - 💬 **Discussions**: [GitHub Discussions](https://github.com/Friedjof/WireguardAdmin/discussions)
-- 📧 **Email**: support@your-domain.com
+- 📧 **Email**: dev@noweck.info
 
 ---
 
